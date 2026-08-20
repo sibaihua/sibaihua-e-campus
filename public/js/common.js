@@ -142,3 +142,12 @@ function esc(s) {
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[c]));
 }
+
+/* 用户头像 HTML：有 avatarUrl 显示图片（加载失败回退首字母），否则首字母圆 */
+function avatarHtml(u) {
+  const initial = esc((u.username || 'A').slice(0, 1).toUpperCase());
+  if (u && u.avatarUrl) {
+    return `<span class="avatar"><img src="${esc(u.avatarUrl)}" alt="" onerror="this.outerHTML='<span class=\\'avatar\\'>${initial}</span>'"></span>`;
+  }
+  return `<span class="avatar">${initial}</span>`;
+}

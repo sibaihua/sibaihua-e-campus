@@ -20,6 +20,7 @@ function rowToUser(r) {
     status: r.status,
     emailAccount: r.email_account || null,
     applyError: r.apply_error || null,
+    avatarUrl: r.avatar_url || null,
     createdAt: r.created_at,
     appliedAt: r.applied_at || null,
   };
@@ -38,6 +39,7 @@ function userToRow(u) {
     status: u.status,
     email_account: u.emailAccount || null,
     apply_error: u.applyError || null,
+    avatar_url: u.avatarUrl || null,
     created_at: u.createdAt,
     applied_at: u.appliedAt || null,
   };
@@ -59,12 +61,12 @@ const db = {
   },
   async createUser(env, u) {
     const r = await env.DB.prepare(
-      `INSERT INTO users (username, salt, password_hash, password_enc, role, english_name, contact_email, email_verified, status, email_account, apply_error, created_at, applied_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO users (username, salt, password_hash, password_enc, role, english_name, contact_email, email_verified, status, email_account, apply_error, avatar_url, created_at, applied_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       u.username, u.salt, u.passwordHash, u.passwordEnc, u.role,
       u.englishName || '', u.contactEmail || '', u.emailVerified ? 1 : 0,
-      u.status, u.emailAccount || null, u.applyError || null, u.createdAt, u.appliedAt || null
+      u.status, u.emailAccount || null, u.applyError || null, u.avatarUrl || null, u.createdAt, u.appliedAt || null
     ).run();
     return db.userById(env, r.meta.last_row_id);
   },
@@ -73,12 +75,12 @@ const db = {
     if (!u) return null;
     const merged = { ...u, ...fields };
     await env.DB.prepare(
-      `UPDATE users SET username=?, salt=?, password_hash=?, password_enc=?, role=?, english_name=?, contact_email=?, email_verified=?, status=?, email_account=?, apply_error=?, applied_at=?
+      `UPDATE users SET username=?, salt=?, password_hash=?, password_enc=?, role=?, english_name=?, contact_email=?, email_verified=?, status=?, email_account=?, apply_error=?, avatar_url=?, applied_at=?
        WHERE id=?`
     ).bind(
       merged.username, merged.salt, merged.passwordHash, merged.passwordEnc, merged.role,
       merged.englishName || '', merged.contactEmail || '', merged.emailVerified ? 1 : 0,
-      merged.status, merged.emailAccount || null, merged.applyError || null, merged.appliedAt || null,
+      merged.status, merged.emailAccount || null, merged.applyError || null, merged.avatarUrl || null, merged.appliedAt || null,
       id
     ).run();
     return db.userById(env, id);
@@ -127,7 +129,7 @@ const db = {
     const { results } = await env.DB.prepare('SELECT * FROM oauth_clients ORDER BY id DESC').all();
     return (results || []).map((r) => ({
       id: r.id, clientId: r.client_id, clientSecret: r.client_secret, name: r.name,
-      redirectUri: r.redirect_uri || '', createdAt: r.created_at, updatedAt: r.updated_at || null,
+      redirectUri: r.redirect_uri || '', logoUrl: r.logo_url || '', createdAt: r.created_at, updatedAt: r.updated_at || null,
     }));
   },
   async oauthClientById(env, clientId) {
@@ -135,21 +137,21 @@ const db = {
     if (!r) return null;
     return {
       id: r.id, clientId: r.client_id, clientSecret: r.client_secret, name: r.name,
-      redirectUri: r.redirect_uri || '', createdAt: r.created_at, updatedAt: r.updated_at || null,
+      redirectUri: r.redirect_uri || '', logoUrl: r.logo_url || '', createdAt: r.created_at, updatedAt: r.updated_at || null,
     };
   },
   async createOauthClient(env, c) {
     const r = await env.DB.prepare(
-      'INSERT INTO oauth_clients (client_id, client_secret, name, redirect_uri, created_at) VALUES (?, ?, ?, ?, ?)'
-    ).bind(c.clientId, c.clientSecret, c.name, c.redirectUri || '', c.createdAt).run();
+      'INSERT INTO oauth_clients (client_id, client_secret, name, redirect_uri, logo_url, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+    ).bind(c.clientId, c.clientSecret, c.name, c.redirectUri || '', c.logoUrl || '', c.createdAt).run();
     return { id: r.meta.last_row_id, ...c };
   },
   async updateOauthClient(env, clientId, fields) {
     const cur = await db.oauthClientById(env, clientId);
     if (!cur) return null;
     const merged = { ...cur, ...fields, updatedAt: new Date().toISOString() };
-    await env.DB.prepare('UPDATE oauth_clients SET name=?, redirect_uri=?, updated_at=? WHERE client_id=?')
-      .bind(merged.name, merged.redirectUri || '', merged.updatedAt, clientId).run();
+    await env.DB.prepare('UPDATE oauth_clients SET name=?, redirect_uri=?, logo_url=?, updated_at=? WHERE client_id=?')
+      .bind(merged.name, merged.redirectUri || '', merged.logoUrl || '', merged.updatedAt, clientId).run();
     return db.oauthClientById(env, clientId);
   },
   async deleteOauthClient(env, clientId) {

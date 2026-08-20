@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS users (
   status        TEXT NOT NULL DEFAULT 'registered',
   email_account TEXT,
   apply_error   TEXT,
+  avatar_url    TEXT,
   created_at    TEXT NOT NULL,
   applied_at    TEXT
 );
@@ -49,6 +50,7 @@ CREATE TABLE IF NOT EXISTS oauth_clients (
   client_secret TEXT NOT NULL,
   name          TEXT NOT NULL,
   redirect_uri  TEXT NOT NULL DEFAULT '',
+  logo_url      TEXT NOT NULL DEFAULT '',
   created_at    TEXT NOT NULL,
   updated_at    TEXT
 );
@@ -79,6 +81,14 @@ export function makeDbInit() {
     .map((s) => s.trim())
     .filter(Boolean)
     .map((s) => s + ';'); // exec 需要语句以分号结尾（miniflare 本地模拟同样要求）
+
+  // 老库补充新列（CREATE TABLE IF NOT EXISTS 不会给已存在的表加列）
+  // 格式：[表, 列, 类型]；用 PRAGMA table_info 检查，缺列才 ALTER
+  const extraColumns = [
+    ['users', 'avatar_url', 'TEXT'],
+    ['oauth_clients', 'logo_url', 'TEXT NOT NULL DEFAULT \'\''],
+  ];
+
   return async function ensureDb(env) {
     if (!env.DB) {
       throw new Error('数据库未就绪：请在 Cloudflare Workers 控制台为该 Worker 添加 D1 绑定（binding 名称必须为 DB）');
@@ -90,6 +100,13 @@ export function makeDbInit() {
             await env.DB.prepare(stmt).run();
           } catch (e) {
             throw new Error(`建表语句执行失败: ${stmt.slice(0, 80)}… (${e.message})`);
+          }
+        }
+        for (const [table, column, colType] of extraColumns) {
+          const cols = await env.DB.prepare(`PRAGMA table_info(${table})`).all();
+          const exists = (cols.results || []).some((c) => c.name === column);
+          if (!exists) {
+            await env.DB.prepare(`ALTER TABLE ${table} ADD COLUMN ${column} ${colType}`).run();
           }
         }
       })().catch((e) => {

@@ -46,6 +46,8 @@
           <input name="englishName" maxlength="60" placeholder="如：San Zhang"></label>
         <label class="field"><span class="field-label">联系邮箱</span>
           <input name="contactEmail" type="email" maxlength="100" placeholder="个人联系邮箱"></label>
+        <label class="field"><span class="field-label">头像链接（可选）</span>
+          <input name="avatarUrl" maxlength="500" placeholder="https://example.com/avatar.png"></label>
         <label class="field"><span class="field-label">角色</span>
           <select name="role"><option value="user">普通用户</option><option value="admin">管理员</option></select></label>
         <label class="field"><span class="field-label">状态</span>
@@ -82,15 +84,17 @@
         <input name="name" placeholder="如：图书馆管理系统" required maxlength="60"></label>
       <label class="field"><span class="field-label">回调地址 redirect_uri（可选）</span>
         <input name="redirectUri" placeholder="https://library.sibaihua.com/callback"></label>
+      <label class="field"><span class="field-label">Logo 图片链接（可选）</span>
+        <input name="logoUrl" placeholder="https://example.com/logo.png"></label>
       <button class="btn btn-primary" type="submit">创建客户端</button>
     </form>
     <p class="error" id="clientErr"></p>
     <div class="table-wrap">
       <table class="data">
         <thead><tr>
-          <th>名称</th><th>client_id</th><th>client_secret</th><th>回调地址</th><th>创建时间</th><th>操作</th>
+          <th>名称</th><th>client_id</th><th>client_secret</th><th>回调地址</th><th>Logo</th><th>创建时间</th><th>操作</th>
         </tr></thead>
-        <tbody id="clientsTbody"><tr><td colspan="6" class="muted" style="text-align:center;padding:30px">暂无客户端</td></tr></tbody>
+        <tbody id="clientsTbody"><tr><td colspan="7" class="muted" style="text-align:center;padding:30px">暂无客户端</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -195,6 +199,7 @@ function startEditUser(u) {
   userEditForm.password.value = '';
   userEditForm.englishName.value = u.englishName || '';
   userEditForm.contactEmail.value = u.contactEmail || '';
+  userEditForm.avatarUrl.value = u.avatarUrl || '';
   userEditForm.role.value = u.role;
   userEditForm.status.value = u.status;
   document.getElementById('userEditErr').textContent = '';
@@ -217,6 +222,7 @@ userEditForm.onsubmit = async (e) => {
     password: fd.get('password') || '',
     englishName: fd.get('englishName'),
     contactEmail: fd.get('contactEmail'),
+    avatarUrl: fd.get('avatarUrl'),
     role: fd.get('role'),
     status: fd.get('status'),
   });
@@ -290,10 +296,11 @@ async function loadClients() {
       <td><code>${esc(c.clientId)}</code></td>
       <td><code>${esc(c.clientSecret)}</code></td>
       <td class="cell-uri">${c.redirectUri ? esc(c.redirectUri) : '<span class="muted">不限制</span>'}</td>
+      <td class="cell-logo">${c.logoUrl ? `<img src="${esc(c.logoUrl)}" alt="logo" class="client-logo" onerror="this.outerHTML='<span class=\\'muted\\'>—</span>'">` : '<span class="muted">—</span>'}</td>
       <td class="muted">${esc(c.createdAt.replace('T', ' ').slice(0, 19))}</td>
       <td>
         <div class="client-actions">
-          <button class="btn btn-ghost" data-edit="${esc(c.clientId)}" data-name="${esc(c.name)}" data-uri="${esc(c.redirectUri || '')}" type="button">编辑</button>
+          <button class="btn btn-ghost" data-edit="${esc(c.clientId)}" data-name="${esc(c.name)}" data-uri="${esc(c.redirectUri || '')}" data-logo="${esc(c.logoUrl || '')}" type="button">编辑</button>
           <button class="btn btn-danger" data-del="${esc(c.clientId)}" type="button">删除</button>
         </div>
       </td>
@@ -308,20 +315,22 @@ async function loadClients() {
   });
 
   tb.querySelectorAll('[data-edit]').forEach((b) => {
-    b.onclick = () => startEditClient(b.dataset.edit, b.dataset.name, b.dataset.uri);
+    b.onclick = () => startEditClient(b.dataset.edit, b.dataset.name, b.dataset.uri, b.dataset.logo);
   });
 }
 
-function startEditClient(clientId, name, redirectUri) {
+function startEditClient(clientId, name, redirectUri, logoUrl) {
   const row = document.querySelector(`tr[data-cid="${esc(clientId)}"]`);
   if (!row) return;
   row.classList.add('edit-row');
   const nameCell = row.querySelector('.cell-name');
   const uriCell = row.querySelector('.cell-uri');
+  const logoCell = row.querySelector('.cell-logo');
   const actionsCell = row.querySelector('.client-actions').parentNode;
 
   nameCell.innerHTML = `<input value="${esc(name)}" id="editName">`;
-  uriCell.innerHTML = `<input value="${esc(redirectUri)}" placeholder="https://..." id="editUri">`;
+  uriCell.innerHTML = `<input value="${esc(redirectUri)}" placeholder="https://..." id="editUri" style="min-width:280px">`;
+  logoCell.innerHTML = `<input value="${esc(logoUrl || '')}" placeholder="https://.../logo.png（可选）" id="editLogo" style="min-width:220px">`;
   actionsCell.innerHTML = `
     <div class="client-actions">
       <button class="btn btn-primary" id="saveEdit" type="button">保存</button>
@@ -335,6 +344,7 @@ function startEditClient(clientId, name, redirectUri) {
       clientId,
       name: document.getElementById('editName').value,
       redirectUri: document.getElementById('editUri').value,
+      logoUrl: document.getElementById('editLogo').value,
     });
     if (r.code === 200) loadClients();
     else err.textContent = r.message || '更新失败';
@@ -350,6 +360,7 @@ document.getElementById('clientForm').onsubmit = async (e) => {
   const r = await API.post('/api/admin/oauth-clients', {
     name: fd.get('name'),
     redirectUri: fd.get('redirectUri'),
+    logoUrl: fd.get('logoUrl'),
   });
   if (r.code === 200) { e.target.reset(); loadClients(); }
   else err.textContent = r.message || '创建失败';
@@ -509,8 +520,7 @@ async function loadDocs() {
   if (me.code !== 200 || !me.data) { location.href = '/'; return; }
   if (me.data.user.role !== 'admin') { location.href = '/app'; return; }
   ME_USERNAME = me.data.user.username;
-  document.getElementById('userChip').innerHTML =
-    `<span class="avatar">${esc(ME_USERNAME.slice(0, 1).toUpperCase())}</span>` +
+  document.getElementById('userChip').innerHTML = avatarHtml(me.data.user) +
     `<span class="uname">${esc(ME_USERNAME)}</span>` +
     `<span class="role-tag">管理员</span>`;
   loadUsers();

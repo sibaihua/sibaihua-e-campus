@@ -134,6 +134,7 @@ function publicUser(u) {
     status: u.status,
     emailAccount: u.emailAccount,
     applyError: u.applyError,
+    avatarUrl: u.avatarUrl || null,
     createdAt: u.createdAt,
     appliedAt: u.appliedAt,
   };
@@ -364,6 +365,26 @@ async function hProfileContactEmail(ctx) {
   return ok({ user: publicUser(updated) }, '联系邮箱已更新');
 }
 
+/* 个人资料更新（联系邮箱 + 头像链接，均为可选字段；提供即覆盖，空串表示清空） */
+async function hProfileUpdate(ctx) {
+  const { body, env, user } = ctx;
+  const fields = {};
+  if (body.contactEmail !== undefined) {
+    const email = String(body.contactEmail || '').trim().toLowerCase();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new ApiError(400, '邮箱格式不正确');
+    fields.contactEmail = email;
+  }
+  if (body.avatarUrl !== undefined) {
+    const avatar = String(body.avatarUrl || '').trim();
+    if (avatar && !/^https?:\/\//i.test(avatar)) throw new ApiError(400, '头像链接必须以 http(s):// 开头');
+    if (avatar.length > 500) throw new ApiError(400, '头像链接过长');
+    fields.avatarUrl = avatar || null;
+  }
+  if (!Object.keys(fields).length) throw new ApiError(400, '没有需要更新的字段');
+  const updated = await db.updateUser(env, user.id, fields);
+  return ok({ user: publicUser(updated) }, '个人资料已更新');
+}
+
 async function hVerifyEmailSend(ctx) {
   const { body, env, user } = ctx;
   const mode = await emailVerifyMode(env);
@@ -557,6 +578,11 @@ async function hAdminUsersUpdate(ctx) {
   if (body.emailAccount !== undefined) {
     fields.emailAccount = String(body.emailAccount || '').trim() || null;
   }
+  if (body.avatarUrl !== undefined) {
+    const avatar = String(body.avatarUrl || '').trim();
+    if (avatar && !/^https?:\/\//i.test(avatar)) throw new ApiError(400, '头像链接必须以 http(s):// 开头');
+    fields.avatarUrl = avatar || null;
+  }
   const updated = await db.updateUser(env, target.id, fields);
   return ok({ user: publicUser(updated) }, '用户已更新');
 }
@@ -697,13 +723,16 @@ async function hAdminClientsCreate(ctx) {
   const { body, env } = ctx;
   const name = String(body.name || '').trim();
   const redirectUri = String(body.redirectUri || '').trim();
+  const logoUrl = String(body.logoUrl || '').trim();
   if (!name || name.length > 60) throw new ApiError(400, '请输入客户端名称（60 字以内）');
   if (redirectUri && !/^https?:\/\//i.test(redirectUri)) throw new ApiError(400, '回调地址必须是 http(s):// 开头的 URL');
+  if (logoUrl && !/^https?:\/\//i.test(logoUrl)) throw new ApiError(400, 'Logo 链接必须是 http(s):// 开头的 URL');
   const client = {
     clientId: 'sib_' + randomHex(8),
     clientSecret: randomHex(24),
     name,
     redirectUri: redirectUri || '',
+    logoUrl: logoUrl || '',
     createdAt: new Date().toISOString(),
   };
   const created = await db.createOauthClient(env, client);
@@ -718,15 +747,20 @@ async function hAdminClientsUpdate(ctx) {
   if (!client) throw new ApiError(404, '客户端不存在');
   const name = String(body.name || '').trim();
   const redirectUri = body.redirectUri === undefined ? client.redirectUri : String(body.redirectUri || '').trim();
+  const logoUrl = body.logoUrl === undefined ? client.logoUrl : String(body.logoUrl || '').trim();
   if (name && name.length <= 60) {
     // 名称留空表示不修改
   }
   if (redirectUri && !/^https?:\/\//i.test(redirectUri)) {
     throw new ApiError(400, '回调地址必须是 http(s):// 开头的 URL');
   }
+  if (logoUrl && !/^https?:\/\//i.test(logoUrl)) {
+    throw new ApiError(400, 'Logo 链接必须是 http(s):// 开头的 URL');
+  }
   const updated = await db.updateOauthClient(env, clientId, {
     name: name || client.name,
     redirectUri,
+    logoUrl,
   });
   return ok({ client: updated }, '客户端已更新');
 }
@@ -748,12 +782,12 @@ async function hOauthAuthorizeInfo(ctx) {
   const clientId = query.get('client_id') || '';
   const redirectUri = query.get('redirect_uri') || '';
   const client = await db.oauthClientById(env, clientId);
-  if (!client) throw new ApiError(400, '无效的 client_id，请先在入学系统后台创建 OAuth 客户端');
+  if (!client) throw new ApiError(400, '无效的 client_id，请先在“我的E校园”管理后台创建 OAuth 客户端');
   if (client.redirectUri && redirectUri !== client.redirectUri) {
     throw new ApiError(400, 'redirect_uri 与客户端登记的回调地址不一致');
   }
   if (!/^https?:\/\//i.test(redirectUri)) throw new ApiError(400, 'redirect_uri 必须是合法的 http(s) URL');
-  return ok({ client: { name: client.name, clientId: client.clientId }, redirectUri });
+  return ok({ client: { name: client.name, clientId: client.clientId, logoUrl: client.logoUrl || '' }, redirectUri });
 }
 
 async function hOauthAuthorizeConfirm(ctx) {
@@ -858,7 +892,7 @@ async function apiDocs(ctx) {
     updatedAt: new Date().toISOString(),
     aiIntegrationNote: `本接口文档面向其他 AI 助手或智能体。如果你是代表某个校园系统（选课、图书馆、门户等）接入“我的E校园”的 AI，请按以下步骤操作：
 
-1. 由系统管理员在入学系统后台「OAuth 客户端」页面创建一个客户端，获取 client_id 与 client_secret。
+1. 由系统管理员在“我的E校园”管理后台「OAuth 客户端」页面创建一个客户端，获取 client_id 与 client_secret。
 2. 管理员可随后通过 PUT /api/admin/oauth-clients 修改该客户端的回调地址（redirect_uri）。
 3. 若你的系统可安全持有用户密码（如第一方系统），使用密码模式（grant_type=password）直接换取 access_token。
 4. 若你的系统是第三方 Web 应用，使用授权码模式：将浏览器重定向到 /oauth?response_type=code&...，用户确认授权后，浏览器会携带 code 跳回 redirect_uri；再用 code 换取 access_token。
@@ -873,8 +907,8 @@ async function apiDocs(ctx) {
             { name: 'grant_type', type: 'string', required: '是', desc: '固定值：password 或 authorization_code' },
             { name: 'client_id', type: 'string', required: '是', desc: '客户端 ID（由管理员在后台创建）' },
             { name: 'client_secret', type: 'string', required: '是', desc: '客户端密钥' },
-            { name: 'username', type: 'string', required: 'password 模式必填', desc: '用户的入学系统用户名；输入 zhangsan 或 zhangsan@gayg.de 效果相同' },
-            { name: 'password', type: 'string', required: 'password 模式必填', desc: '用户的入学系统登录密码' },
+            { name: 'username', type: 'string', required: 'password 模式必填', desc: '用户的「我的E校园」用户名；输入 zhangsan 或 zhangsan@gayg.de 效果相同' },
+            { name: 'password', type: 'string', required: 'password 模式必填', desc: '用户的「我的E校园」登录密码' },
             { name: 'code', type: 'string', required: 'authorization_code 模式必填', desc: '授权码模式第 2 步换取的 code，5 分钟内有效且只能使用一次' },
             { name: 'redirect_uri', type: 'string', required: 'authorization_code 模式必填', desc: '必须与授权请求时传入的 redirect_uri 完全一致' },
           ], example: `curl -X POST ${base}/api/oauth/token \\\n  -H "Content-Type: application/json" \\\n  -d '{"grant_type":"password","client_id":"sib_xxx","client_secret":"xxx","username":"zhangsan","password":"用户密码"}'`, response: '{\n  "code": 200,\n  "message": "success",\n  "data": {\n    "access_token": "3f9c...（64位十六进制）",\n    "token_type": "Bearer",\n    "expires_in": 7200,\n    "scope": "userinfo"\n  }\n}' },
@@ -1033,6 +1067,10 @@ const routes = [
   ['POST', /^\/api\/profile\/contact-email$/, async (ctx) => {
     if (!ctx.user) throw new ApiError(401, '未登录或登录已过期');
     return hProfileContactEmail(ctx);
+  }],
+  ['POST', /^\/api\/profile\/update$/, async (ctx) => {
+    if (!ctx.user) throw new ApiError(401, '未登录或登录已过期');
+    return hProfileUpdate(ctx);
   }],
 
   ['GET', /^\/api\/admin\/users$/, hAdminUsers],

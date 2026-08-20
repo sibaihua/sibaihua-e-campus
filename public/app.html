@@ -79,7 +79,7 @@ function renderMenu() {
 function renderChip() {
   const u = state.user;
   document.getElementById('userChip').innerHTML =
-    `<span class="avatar">${esc(u.username.slice(0, 1).toUpperCase())}</span>` +
+    avatarHtml(u) +
     `<span class="uname">${esc(u.username)}</span>` +
     (u.role === 'admin' ? '<span class="role-tag">管理员</span>' : '');
   document.getElementById('adminLink').hidden = u.role !== 'admin';
@@ -308,6 +308,21 @@ function renderProfile() {
       ${emailBlock}
       <p class="error" id="profileErr" style="margin-top:10px"></p>
       <button class="btn btn-primary" type="button" id="profileEmailSave" style="margin-top:6px">保存联系邮箱</button>
+    </section>
+
+    <section class="card main-card" style="margin-top:22px">
+      <div class="card-head"><h2>个人设置 · 头像</h2>
+        <p class="muted">通过图片链接设置头像（可选），留空则使用用户名首字母头像。</p></div>
+      <div class="field">
+        <span class="field-label">头像图片链接</span>
+        <div class="email-verify-row">
+          <input id="profileAvatar" type="url" maxlength="500" value="${esc(u.avatarUrl || '')}" placeholder="https://example.com/avatar.png">
+          <span class="avatar" id="avatarPreview" style="width:38px;height:38px;font-size:16px">${esc((u.username || 'A').slice(0, 1).toUpperCase())}</span>
+        </div>
+        <div class="captcha-hint">支持 http(s) 链接；填写后下方可预览，留空保存则清除头像</div>
+      </div>
+      <p class="error" id="avatarErr" style="margin-top:10px"></p>
+      <button class="btn btn-primary" type="button" id="profileAvatarSave" style="margin-top:6px">保存头像</button>
     </section>`;
 }
 
@@ -344,12 +359,44 @@ function bindProfile() {
         err.textContent = '';
         const email = document.getElementById('profileContactEmail').value.trim().toLowerCase();
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err.textContent = '请输入有效的邮箱地址'; return; }
-        // 复用管理员更新接口中的邮箱逻辑：这里调用 apply 同款校验不可行，改为公开的用户邮箱更新接口
-        const r = await API.post('/api/profile/contact-email', { contactEmail: email });
+        const r = await API.post('/api/profile/update', { contactEmail: email });
         if (r.code === 200 && r.data && r.data.user) {
           state.user = r.data.user;
           err.style.color = 'var(--success)'; err.textContent = '联系邮箱已更新';
           render();
+        } else {
+          err.style.color = ''; err.textContent = r.message || '保存失败';
+        }
+      };
+    }
+  }
+
+  // 头像：预览 + 保存
+  const avatarInput = document.getElementById('profileAvatar');
+  const avatarPreview = document.getElementById('avatarPreview');
+  const initial = esc((state.user.username || 'A').slice(0, 1).toUpperCase());
+  if (avatarInput && avatarPreview) {
+    const updatePreview = () => {
+      const v = avatarInput.value.trim();
+      if (v && /^https?:\/\//i.test(v)) {
+        avatarPreview.innerHTML = `<img src="${esc(v)}" alt="" onerror="this.outerHTML='${initial}'">`;
+      } else {
+        avatarPreview.textContent = initial;
+      }
+    };
+    avatarInput.addEventListener('input', updatePreview);
+    const saveAvatarBtn = document.getElementById('profileAvatarSave');
+    if (saveAvatarBtn) {
+      saveAvatarBtn.onclick = async () => {
+        const err = document.getElementById('avatarErr');
+        err.textContent = '';
+        const avatarUrl = avatarInput.value.trim();
+        if (avatarUrl && !/^https?:\/\//i.test(avatarUrl)) { err.textContent = '头像链接必须以 http(s):// 开头'; return; }
+        const r = await API.post('/api/profile/update', { avatarUrl });
+        if (r.code === 200 && r.data && r.data.user) {
+          state.user = r.data.user;
+          err.style.color = 'var(--success)'; err.textContent = '头像已保存';
+          renderChip();
         } else {
           err.style.color = ''; err.textContent = r.message || '保存失败';
         }
