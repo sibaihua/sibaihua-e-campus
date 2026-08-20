@@ -1,0 +1,46 @@
+# 司白画大学清迈分校「我的E校园」— Cloudflare Worker 配置
+# 本配置面向「GitHub 导入 + 控制台绑定」的零命令行部署方式：
+#
+# 1. 把整个项目目录推送到 GitHub（node_modules 已被 .gitignore 排除）
+# 2. Cloudflare 控制台 → Workers & Pages → Create → 连接 GitHub 仓库（或上传代码）
+# 3. 部署成功后，在 Worker 的 Settings 里手动绑定：
+#    - 数据存储：Settings → Bindings → Add → D1 Database
+#      binding 名称必须填 DB，选择（或新建）你的 D1 数据库
+#      表结构会在首次请求 API 时自动创建，无需执行任何命令
+#    - 环境变量：Settings → Variables → 按 README 的变量表逐个添加
+#
+# 本地开发（可选）：取消下方 [[d1_databases]] 注释并填 database_id 后
+#   npm run dev（wrangler dev 默认本地模式，无需登录）
+
+name = "sibaihua-e-campus"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# 静态前端资源（自动托管 public/ 目录）
+[assets]
+directory = "./public"
+not_found_handling = "none"
+
+# ─────────────────────────────────────────────────────────────────────
+# D1 数据库绑定（控制台手动绑定，无需在此填写）
+# 若在本地开发需要 D1，请取消注释并填入 wrangler d1 create 得到的 database_id：
+#
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "sibaihua-e-campus"
+# database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+# ─────────────────────────────────────────────────────────────────────
+
+# ─────────────────────────────────────────────────────────────────────
+# 环境变量：全部推荐在 Workers 控制台 Settings → Variables 手动添加
+# （本地开发可复制 .dev.vars.example 为 .dev.vars）
+# 可选变量（均有代码内置默认值）：
+#   SECRET                密码加密密钥（生产必改，≥32 位随机串）
+#   SEED_ADMIN_PASSWORD   首次部署自动创建的管理员 iam 的密码（默认 858308533）
+#   TURNSTILE_SECRET      Cloudflare Turnstile 服务端密钥
+#   TURNSTILE_SITE_KEY    Turnstile 站点密钥（一般无需设置）
+#   MAIL_API_BASE         Cloud Mail 服务地址（默认 https://gayg.de）
+#   MAIL_FROM / MAIL_FROM_NAME / MAILCHANNELS_API_KEY
+#                         邮件服务默认发件配置（也可在管理后台「系统设置」中填写）
+# ─────────────────────────────────────────────────────────────────────

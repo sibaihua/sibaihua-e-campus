@@ -1,0 +1,9 @@
+# 本地开发环境变量模板（复制为 .dev.vars 后填写；已 gitignore，不会上传 GitHub）
+# 生产环境请在 Cloudflare Workers 控制台 → Settings → Variables 中手动添加
+SECRET=sibaihua-admission-2026-default-secret
+TURNSTILE_SECRET=0x4AAAAAAEWvm_-KpS9SUypKfVV_S-tgsdM
+TURNSTILE_SITE_KEY=0x4AAAAAAEWvmxLZVjDXieV9
+MAIL_API_BASE=https://gayg.de
+# MAILCHANNELS_API_KEY=你的MailChannels密钥
+# MAIL_FROM=no-reply@sibh.cn
+# MAIL_FROM_NAME=司白画大学清迈分校 · 我的E校园

@@ -1,0 +1,15 @@
+# 依赖与本地缓存
+node_modules/
+.wrangler/
+.test-persist/
+
+# 本地环境变量（含密钥，勿上传）
+.dev.vars
+
+# 迁移脚本生成的 SQL（含加密后的密码密文，勿上传）
+migrate_users.sql
+
+# 日志与系统文件
+*.log
+.DS_Store
+Thumbs.db
