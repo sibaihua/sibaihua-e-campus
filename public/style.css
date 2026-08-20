@@ -163,7 +163,9 @@ code { font-family: Consolas, "Courier New", monospace; background: var(--navy-p
   background: var(--navy); color: #fff;
   display: inline-flex; align-items: center; justify-content: center;
   font-size: 13px; font-weight: bold; flex-shrink: 0;
+  object-fit: cover; overflow: hidden;
 }
+.user-chip .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .user-chip .uname { line-height: 1; font-weight: 500; }
 .user-chip .role-tag {
   margin-left: 2px; padding: 2px 8px; border-radius: 999px; font-size: 11px;
@@ -265,6 +267,7 @@ table.data tr:hover td { background: #f4f7fa; }
 
 .client-actions { display: flex; gap: 8px; }
 .client-actions .btn { padding: 4px 12px; font-size: 12px; }
+.client-logo { width: 26px; height: 26px; object-fit: contain; border-radius: 6px; background: #fff; border: 1px solid var(--border); vertical-align: middle; }
 .edit-row td { background: #f8fafc; }
 .edit-row input { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; }
 
@@ -310,6 +313,10 @@ pre.doc-code {
   width: 40px; height: 40px; border-radius: 50%; background: var(--navy);
   color: #fff; display: flex; align-items: center; justify-content: center;
   font-size: 18px; font-weight: bold; flex-shrink: 0;
+}
+.oauth-app .app-logo {
+  width: 40px; height: 40px; border-radius: 10px; object-fit: contain;
+  background: #fff; border: 1px solid var(--border); flex-shrink: 0;
 }
 .oauth-perms { text-align: left; margin: 18px 0 26px; font-size: 13.5px; color: var(--text); }
 .oauth-perms li { list-style: none; padding: 6px 0; display: flex; gap: 8px; align-items: baseline; }

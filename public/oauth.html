@@ -52,7 +52,7 @@ async function confirm() {
     card.innerHTML = `
       <h2>授权失败</h2>
       <p class="error" style="margin-top:10px">${esc(r.message || '未知错误')}</p>
-      <button class="btn btn-ghost btn-block" style="margin-top:14px" onclick="location.href='/app'">返回入学系统</button>`;
+      <button class="btn btn-ghost btn-block" style="margin-top:14px" onclick="location.href='/app'">返回我的E校园</button>`;
   }
 }
 
@@ -77,11 +77,14 @@ async function confirm() {
 
   const app = info.data.client;
   const initial = (app.name || 'A').trim().charAt(0).toUpperCase();
+  const logo = app.logoUrl
+    ? `<img src="${esc(app.logoUrl)}" alt="" class="app-logo" onerror="this.outerHTML='<span class=\\'app-icon\\'>${esc(initial)}</span>'">`
+    : `<span class="app-icon">${esc(initial)}</span>`;
   card.innerHTML = `
     <h2>确认授权</h2>
     <p class="muted" style="margin-top:8px">你正在使用“我的E校园”账号<br><strong>${esc(me.data.user.username)}</strong>（${esc(me.data.user.username)}@gayg.de）</p>
     <div class="oauth-app">
-      <span class="app-icon">${esc(initial)}</span>
+      ${logo}
       <div><strong>${esc(app.name)}</strong><br><span class="muted" style="font-size:12px">${esc(app.clientId)}</span></div>
     </div>
     <p class="muted">该系统申请获得以下权限：</p>
