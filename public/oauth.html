@@ -7,38 +7,39 @@
 <link rel="icon" type="image/png" href="/crest.png">
 <link rel="stylesheet" href="/style.css">
 </head>
-<body class="auth-page">
-<div class="rainbow-bar"></div>
-
-<div class="auth-layout">
-  <!-- 左：品牌展示区 -->
-  <div class="auth-hero">
-    <div class="hero-crest" id="crestBox"></div>
-    <h1>司白画大学清迈分校</h1>
-    <div class="en">Sibaihua University · Chiang Mai Campus</div>
-    <div class="hero-motto">One World, One Dream</div>
-    <div class="hero-points">
-      <div class="hero-point"><span class="hp-icon">🔐</span><span>统一账号授权<br>OAuth 2.0 标准协议</span></div>
-      <div class="hero-point"><span class="hp-icon">🛡️</span><span>仅共享基础身份信息<br>绝不涉及密码</span></div>
-      <div class="hero-point"><span class="hp-icon">⏱️</span><span>授权码 5 分钟有效<br>令牌 2 小时有效期</span></div>
-      <div class="hero-point"><span class="hp-icon">↩️</span><span>可随时撤回授权<br>登录态独立管理</span></div>
+<body>
+<nav class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="/" id="brandBox"></a>
+    <div class="topbar-right">
+      <a href="https://sibaihua.com/" target="_blank" rel="noopener" class="toplink">校园官网</a>
+      <a href="https://gayg.de/" target="_blank" rel="noopener" class="toplink">校园邮箱</a>
     </div>
   </div>
+</nav>
 
-  <!-- 右：授权确认 -->
-  <div class="auth-panel">
+<div class="auth-page">
+  <div class="auth-wrap oauth-wrap">
+    <div class="auth-brand">
+      <div id="crestBox"></div>
+      <h1>司白画大学清迈分校</h1>
+      <div class="en">Sibaihua University · Chiang Mai Campus</div>
+      <div class="sys">统 一 账 号 授 权</div>
+    </div>
+
     <div class="card oauth-card" id="oauthCard">
       <div class="loading">正在加载 …</div>
     </div>
   </div>
-</div>
 
-<div class="auth-footer">OAuth 2.0</div>
+  <div class="auth-footer">One World, One Dream · © 2026 司白画大学清迈分校</div>
+</div>
 
 <script src="/js/common.js"></script>
 <script>
 'use strict';
-document.getElementById('crestBox').innerHTML = crestImg(88);
+renderBrand(document.getElementById('brandBox'));
+document.getElementById('crestBox').innerHTML = crestImg(72);
 
 const q = new URLSearchParams(location.search);
 const clientId = q.get('client_id') || '';

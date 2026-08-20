@@ -7,26 +7,26 @@
 <link rel="icon" type="image/png" href="/crest.png">
 <link rel="stylesheet" href="/style.css">
 </head>
-<body class="auth-page">
-<div class="rainbow-bar"></div>
-
-<div class="auth-layout">
-  <!-- 左：品牌展示区（官网风格） -->
-  <div class="auth-hero">
-    <div class="hero-crest" id="crestBox"></div>
-    <h1>司白画大学清迈分校</h1>
-    <div class="en">Sibaihua University · Chiang Mai Campus</div>
-    <div class="hero-motto">One World, One Dream</div>
-    <div class="hero-points">
-      <div class="hero-point"><span class="hp-icon">🎓</span><span>清迈茵他侬山麓<br>综合性自治大学</span></div>
-      <div class="hero-point"><span class="hp-icon">🌏</span><span>曼谷 · 北京<br>全球联络网络</span></div>
-      <div class="hero-point"><span class="hp-icon">📧</span><span>申请即开通<br>校园邮箱 @gayg.de</span></div>
-      <div class="hero-point"><span class="hp-icon">🔐</span><span>统一账号体系<br>OAuth 2.0 校园接入</span></div>
+<body>
+<nav class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="/" id="brandBox"></a>
+    <div class="topbar-right">
+      <a href="https://sibaihua.com/" target="_blank" rel="noopener" class="toplink">校园官网</a>
+      <a href="https://gayg.de/" target="_blank" rel="noopener" class="toplink">校园邮箱</a>
     </div>
   </div>
+</nav>
 
-  <!-- 右：登录 / 注册 -->
-  <div class="auth-panel">
+<div class="auth-page">
+  <div class="auth-wrap">
+    <div class="auth-brand">
+      <div id="crestBox"></div>
+      <h1>司白画大学清迈分校</h1>
+      <div class="en">Sibaihua University · Chiang Mai Campus</div>
+      <div class="sys">我 的 E 校 园</div>
+    </div>
+
     <div class="card auth-card">
       <div class="tabs">
         <button class="tab active" id="tabLogin" type="button">登 录</button>
@@ -77,14 +77,15 @@
       </form>
     </div>
   </div>
-</div>
 
-<div class="auth-footer">One World, One Dream · © 2026 司白画大学清迈分校</div>
+  <div class="auth-footer">One World, One Dream · © 2026 司白画大学清迈分校</div>
+</div>
 
 <script src="/js/common.js"></script>
 <script>
 'use strict';
-document.getElementById('crestBox').innerHTML = crestImg(88);
+renderBrand(document.getElementById('brandBox'));
+document.getElementById('crestBox').innerHTML = crestImg(80);
 
 const tabLogin = document.getElementById('tabLogin');
 const tabReg = document.getElementById('tabReg');
