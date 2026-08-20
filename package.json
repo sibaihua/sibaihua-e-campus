@@ -1,0 +1,17 @@
+{
+  "name": "sibaihua-e-campus-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "司白画大学清迈分校「我的E校园」— Cloudflare Worker 版（D1 存储 + MailChannels 发信）",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:init": "wrangler d1 execute sibaihua-e-campus --file=./schema.sql",
+    "db:init:local": "wrangler d1 execute sibaihua-e-campus --local --file=./schema.sql",
+    "db:migrate": "node migrate.cjs"
+  },
+  "devDependencies": {
+    "wrangler": "^3.90.0"
+  }
+}

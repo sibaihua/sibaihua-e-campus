@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>账号授权 · 司白画大学清迈分校“我的E校园”</title>
+<link rel="icon" type="image/png" href="/crest.png">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body class="auth-page">
+<div class="auth-wrap oauth-wrap">
+  <div class="auth-brand">
+    <div id="crestBox"></div>
+    <h1>司白画大学清迈分校</h1>
+    <div class="en">Sibaihua University · Chiang Mai Campus</div>
+    <div class="sys">统 一 账 号 授 权</div>
+  </div>
+
+  <div class="card oauth-card" id="oauthCard">
+    <div class="loading">正在加载 …</div>
+  </div>
+
+  <div class="auth-footer">OAuth 2.0 Authorization Endpoint</div>
+</div>
+
+<script src="/js/common.js"></script>
+<script>
+'use strict';
+document.getElementById('crestBox').innerHTML = crestImg(72);
+
+const q = new URLSearchParams(location.search);
+const clientId = q.get('client_id') || '';
+const redirectUri = q.get('redirect_uri') || '';
+const state = q.get('state') || '';
+const responseType = q.get('response_type') || '';
+const card = document.getElementById('oauthCard');
+
+function deny() {
+  if (redirectUri && /^https?:\/\//.test(redirectUri)) {
+    const sep = redirectUri.includes('?') ? '&' : '?';
+    location.href = `${redirectUri}${sep}error=access_denied&state=${encodeURIComponent(state)}`;
+  } else {
+    history.back();
+  }
+}
+
+async function confirm() {
+  const r = await API.post('/api/oauth/authorize', { clientId, redirectUri, state });
+  if (r.code === 200 && r.data && r.data.redirect) {
+    location.href = r.data.redirect;
+  } else {
+    card.innerHTML = `
+      <h2>授权失败</h2>
+      <p class="error" style="margin-top:10px">${esc(r.message || '未知错误')}</p>
+      <button class="btn btn-ghost btn-block" style="margin-top:14px" onclick="location.href='/app'">返回入学系统</button>`;
+  }
+}
+
+(async () => {
+  if (responseType !== 'code') {
+    card.innerHTML = `<h2>参数错误</h2><p class="error" style="margin-top:10px">不支持的 response_type，必须为 code</p>`;
+    return;
+  }
+
+  const info = await API.get(`/api/oauth/authorize/info?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}`);
+  if (info.code !== 200) {
+    card.innerHTML = `<h2>无法授权</h2><p class="error" style="margin-top:10px">${esc(info.message || '无效的授权请求')}</p>`;
+    return;
+  }
+
+  const me = await API.get('/api/auth/me');
+  if (me.code !== 200 || !me.data) {
+    // 未登录：跳去登录页，登录后回到本页继续授权
+    location.href = `/?next=${encodeURIComponent(location.href)}`;
+    return;
+  }
+
+  const app = info.data.client;
+  const initial = (app.name || 'A').trim().charAt(0).toUpperCase();
+  card.innerHTML = `
+    <h2>确认授权</h2>
+    <p class="muted" style="margin-top:8px">你正在使用“我的E校园”账号<br><strong>${esc(me.data.user.username)}</strong>（${esc(me.data.user.username)}@gayg.de）</p>
+    <div class="oauth-app">
+      <span class="app-icon">${esc(initial)}</span>
+      <div><strong>${esc(app.name)}</strong><br><span class="muted" style="font-size:12px">${esc(app.clientId)}</span></div>
+    </div>
+    <p class="muted">该系统申请获得以下权限：</p>
+    <ul class="oauth-perms">
+      <li>获取你的账号基本信息（用户名、校园邮箱、英文姓名）</li>
+      <li>以你的身份在本系统中标识账号（不含密码）</li>
+    </ul>
+    <div class="oauth-actions">
+      <button class="btn btn-ghost" id="denyBtn" type="button">拒 绝</button>
+      <button class="btn btn-primary" id="okBtn" type="button">同意授权</button>
+    </div>`;
+  document.getElementById('denyBtn').onclick = deny;
+  document.getElementById('okBtn').onclick = confirm;
+})();
+</script>
+</body>
+</html>

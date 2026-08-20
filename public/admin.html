@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>管理后台 · 司白画大学清迈分校“我的E校园”</title>
+<link rel="icon" type="image/png" href="/crest.png">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<nav class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="/admin" id="brandBox"></a>
+    <div class="topbar-right">
+      <a href="/app" class="toplink">↗ 前台</a>
+      <span class="user-chip" id="userChip"></span>
+      <button class="btn btn-ghost btn-sm" id="logoutBtn" type="button">退出登录</button>
+    </div>
+  </div>
+</nav>
+
+<main class="container">
+  <div class="tabs admin-tabs">
+    <button class="tab active" data-tab="users" type="button">用户管理</button>
+    <button class="tab" data-tab="clients" type="button">OAuth 客户端</button>
+    <button class="tab" data-tab="settings" type="button">系统设置</button>
+    <button class="tab" data-tab="docs" type="button">API 接口文档</button>
+  </div>
+
+  <section class="card admin-card" id="panel-users">
+    <div class="card-head">
+      <h2>用户列表</h2>
+      <p class="muted" id="userStats"></p>
+    </div>
+    <form id="userEditForm" class="card user-edit-panel" hidden>
+      <div class="card-head">
+        <h2 id="userEditTitle">编辑用户</h2>
+        <p class="muted">修改用户名会同步更新已开通的校园邮箱前缀；密码留空表示不修改。</p>
+      </div>
+      <div class="form-grid">
+        <label class="field"><span class="field-label">用户名</span>
+          <input name="username" maxlength="30" placeholder="2-30 位字母/数字"></label>
+        <label class="field"><span class="field-label">重置密码（留空不修改）</span>
+          <input name="password" type="password" maxlength="64" placeholder="6-64 位，留空保持不变" autocomplete="new-password"></label>
+        <label class="field"><span class="field-label">英文姓名</span>
+          <input name="englishName" maxlength="60" placeholder="如：San Zhang"></label>
+        <label class="field"><span class="field-label">联系邮箱</span>
+          <input name="contactEmail" type="email" maxlength="100" placeholder="个人联系邮箱"></label>
+        <label class="field"><span class="field-label">角色</span>
+          <select name="role"><option value="user">普通用户</option><option value="admin">管理员</option></select></label>
+        <label class="field"><span class="field-label">状态</span>
+          <select name="status">
+            <option value="registered">待申请</option>
+            <option value="approved">已录取</option>
+            <option value="failed">开户失败</option>
+          </select></label>
+      </div>
+      <p class="error" id="userEditErr"></p>
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit" id="userEditSave">保存修改</button>
+        <button class="btn btn-ghost" type="button" id="userEditCancel">取消</button>
+      </div>
+    </form>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr>
+          <th>ID</th><th>用户名</th><th>英文姓名</th><th>联系邮箱</th>
+          <th>状态</th><th>校园邮箱</th><th>申请时间</th><th>注册时间</th><th>操作</th>
+        </tr></thead>
+        <tbody id="usersTbody"><tr><td colspan="9" class="muted" style="text-align:center;padding:30px">加载中…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card admin-card" id="panel-clients" hidden>
+    <div class="card-head">
+      <h2>OAuth 客户端</h2>
+      <p class="muted">供其他校园系统（如选课系统、图书馆系统）接入本系统账号体系，实现统一登录（OAuth 2.0）。接入方法见「API 接口文档」。</p>
+    </div>
+    <form id="clientForm" class="form-inline">
+      <label class="field"><span class="field-label">客户端名称</span>
+        <input name="name" placeholder="如：图书馆管理系统" required maxlength="60"></label>
+      <label class="field"><span class="field-label">回调地址 redirect_uri（可选）</span>
+        <input name="redirectUri" placeholder="https://library.sibaihua.com/callback"></label>
+      <button class="btn btn-primary" type="submit">创建客户端</button>
+    </form>
+    <p class="error" id="clientErr"></p>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr>
+          <th>名称</th><th>client_id</th><th>client_secret</th><th>回调地址</th><th>创建时间</th><th>操作</th>
+        </tr></thead>
+        <tbody id="clientsTbody"><tr><td colspan="6" class="muted" style="text-align:center;padding:30px">暂无客户端</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card admin-card" id="panel-settings" hidden>
+    <div class="card-head">
+      <h2>系统设置 · 邮箱服务管理员</h2>
+      <p class="muted">系统使用以下 Cloud Mail（<a href="https://gayg.de/" target="_blank" rel="noopener">gayg.de</a>）管理员邮箱与密码调用 <code>genToken</code> 接口生成令牌，用于自动开通校园邮箱。修改后系统会立即验证连通性。</p>
+    </div>
+    <form id="settingsForm">
+      <div class="form-grid">
+        <label class="field"><span class="field-label">管理员邮箱 <em>*</em></span>
+          <input name="mailAdminEmail" type="email" required maxlength="100" placeholder="admin@gayg.de"></label>
+        <label class="field"><span class="field-label">邮箱密码（留空表示不修改）</span>
+          <input name="mailAdminPassword" type="password" maxlength="64" placeholder="留空保持当前密码不变" autocomplete="new-password"></label>
+        <label class="field"><span class="field-label">Cloudflare Turnstile 人机验证</span>
+          <select name="turnstileEnabled">
+            <option value="1">开启（注册、提交入学申请需验证）</option>
+            <option value="0">关闭（全部操作均不验证）</option>
+          </select>
+          <div class="captcha-hint">登录固定不开启人机验证</div></label>
+        <label class="field"><span class="field-label">邮箱验证功能（个人联系邮箱验证码）</span>
+          <select name="emailVerifyMode">
+            <option value="auto">自动（推荐：配置了邮件服务才启用验证，否则直接填写邮箱即可）</option>
+            <option value="on">始终开启（未配置邮件服务时申请会提示先验证邮箱）</option>
+            <option value="off">关闭（学生申请无需验证邮箱）</option>
+          </select>
+          <div class="captcha-hint">此项为可选功能：未开启时，入学申请直接填写个人联系邮箱即可提交，不再要求邮件验证码</div></label>
+      </div>
+      <p class="muted" id="settingsInfo"></p>
+      <p class="error" id="settingsErr"></p>
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit" id="settingsSave">保存设置</button>
+      </div>
+    </form>
+
+    <hr style="margin:28px 0;border:none;border-top:1px solid var(--border)">
+    <h2>系统设置 · 邮件服务（MailChannels）</h2>
+    <p class="muted">Cloudflare Worker 无法直连 SMTP 服务器，验证码邮件改由 <strong>MailChannels Transactional Email API</strong>（Cloudflare 生态，免费）发送。发件域名需先在 DNS 中添加 MailChannels 验证记录（详见部署 README）。用于向申请人的<strong>个人联系邮箱</strong>发送验证码邮件（入学申请前置条件）。</p>
+    <form id="smtpForm">
+      <div class="form-grid">
+        <label class="field"><span class="field-label">邮件通道</span>
+          <select name="provider">
+            <option value="mailchannels" selected>MailChannels（推荐，Cloudflare 生态）</option>
+          </select></label>
+        <label class="field"><span class="field-label">发件邮箱 <em>*</em></span>
+          <input name="from" type="email" required maxlength="100" placeholder="no-reply@sibh.cn"></label>
+        <label class="field"><span class="field-label">发件人显示名称</span>
+          <input name="fromName" maxlength="60" placeholder="司白画大学清迈分校 · 我的E校园"></label>
+        <label class="field"><span class="field-label">MailChannels API Key（留空不修改）</span>
+          <input name="apiKey" type="password" maxlength="200" placeholder="留空保持当前 Key 不变" autocomplete="new-password"></label>
+        <label class="field"><span class="field-label">测试收件邮箱（仅测试用）</span>
+          <input name="to" type="email" maxlength="100" placeholder="留空则发送到发件邮箱"></label>
+      </div>
+      <p class="muted" id="smtpInfo"></p>
+      <p class="error" id="smtpErr"></p>
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit" id="smtpSave">保存邮件服务配置</button>
+        <button class="btn btn-ghost" type="button" id="smtpTest">发送测试邮件</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card admin-card" id="panel-docs" hidden>
+    <div class="card-head">
+      <h2>API 接口文档</h2>
+      <p class="muted">基础地址 <code id="baseUrl"></code> · 供其他校园系统、AI 助手与智能体接入</p>
+    </div>
+    <div id="docsIntro"></div>
+    <div id="docsBody"><div class="loading">加载中…</div></div>
+  </section>
+</main>
+
+<script src="/js/common.js"></script>
+<script>
+'use strict';
+renderBrand(document.getElementById('brandBox'));
+document.getElementById('logoutBtn').onclick = logout;
+
+/* ---------- Tab 切换 ---------- */
+document.querySelectorAll('.admin-tabs .tab').forEach((t) => {
+  t.onclick = () => {
+    document.querySelectorAll('.admin-tabs .tab').forEach((x) => x.classList.remove('active'));
+    t.classList.add('active');
+    ['users', 'clients', 'settings', 'docs'].forEach((k) => {
+      document.getElementById('panel-' + k).hidden = k !== t.dataset.tab;
+    });
+  };
+});
+
+/* ---------- 用户管理 ---------- */
+let currentUserId = null;
+let ME_USERNAME = '';
+
+const userEditForm = document.getElementById('userEditForm');
+
+function startEditUser(u) {
+  currentUserId = u.id;
+  userEditForm.hidden = false;
+  document.getElementById('userEditTitle').textContent = `编辑用户 #${u.id} · ${u.username}`;
+  userEditForm.username.value = u.username;
+  userEditForm.password.value = '';
+  userEditForm.englishName.value = u.englishName || '';
+  userEditForm.contactEmail.value = u.contactEmail || '';
+  userEditForm.role.value = u.role;
+  userEditForm.status.value = u.status;
+  document.getElementById('userEditErr').textContent = '';
+  userEditForm.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+document.getElementById('userEditCancel').onclick = () => {
+  currentUserId = null;
+  userEditForm.hidden = true;
+};
+
+userEditForm.onsubmit = async (e) => {
+  e.preventDefault();
+  const err = document.getElementById('userEditErr');
+  err.textContent = '';
+  const fd = new FormData(e.target);
+  const r = await API.put('/api/admin/users', {
+    id: currentUserId,
+    username: fd.get('username'),
+    password: fd.get('password') || '',
+    englishName: fd.get('englishName'),
+    contactEmail: fd.get('contactEmail'),
+    role: fd.get('role'),
+    status: fd.get('status'),
+  });
+  if (r.code === 200) {
+    userEditForm.hidden = true;
+    currentUserId = null;
+    loadUsers();
+  } else {
+    err.textContent = r.message || '保存失败';
+  }
+};
+
+async function loadUsers() {
+  const r = await API.get('/api/admin/users');
+  if (r.code !== 200) return;
+  const { users, stats } = r.data;
+  document.getElementById('userStats').textContent =
+    `共 ${stats.total} 个账号：待申请 ${stats.registered} · 已录取 ${stats.approved} · 开户失败 ${stats.failed}`;
+  const tb = document.getElementById('usersTbody');
+  if (!users.length) {
+    tb.innerHTML = '<tr><td colspan="9" class="muted" style="text-align:center;padding:30px">暂无用户</td></tr>';
+    return;
+  }
+  const meChip = ME_USERNAME;
+  tb.innerHTML = users.map((u) => `
+    <tr data-uid="${u.id}">
+      <td>${u.id}</td>
+      <td><strong>${esc(u.username)}</strong>${u.username === meChip ? ' <span class="muted">(我)</span>' : ''}</td>
+      <td>${esc(u.englishName) || '<span class="muted">—</span>'}</td>
+      <td>${esc(u.contactEmail) || '<span class="muted">—</span>'}</td>
+      <td>${statusBadge(u)}</td>
+      <td>${u.emailAccount ? esc(u.emailAccount) : '<span class="muted">—</span>'}</td>
+      <td class="muted">${u.appliedAt ? esc(u.appliedAt.replace('T', ' ').slice(0, 19)) : '—'}</td>
+      <td class="muted">${esc(u.createdAt.replace('T', ' ').slice(0, 19))}</td>
+      <td>
+        <div class="client-actions">
+          <button class="btn btn-ghost" data-edit-user="${u.id}" type="button">编辑</button>
+          <button class="btn btn-danger" data-del-user="${u.id}" data-uname="${esc(u.username)}" type="button">删除</button>
+        </div>
+      </td>
+    </tr>`).join('');
+
+  tb.querySelectorAll('[data-edit-user]').forEach((b) => {
+    b.onclick = () => {
+      const u = users.find((x) => x.id === Number(b.dataset.editUser));
+      if (u) startEditUser(u);
+    };
+  });
+  tb.querySelectorAll('[data-del-user]').forEach((b) => {
+    b.onclick = async () => {
+      if (!confirm(`确定删除用户「${b.dataset.uname}」？该操作不可恢复，其所有登录会话将立即失效。`)) return;
+      const r = await API.del('/api/admin/users', { id: Number(b.dataset.delUser) });
+      if (r.code === 200) loadUsers();
+      else alert(r.message || '删除失败');
+    };
+  });
+}
+
+/* ---------- OAuth 客户端 ---------- */
+async function loadClients() {
+  const r = await API.get('/api/admin/oauth-clients');
+  if (r.code !== 200) return;
+  const tb = document.getElementById('clientsTbody');
+  if (!r.data.clients.length) {
+    tb.innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center;padding:30px">暂无客户端</td></tr>';
+    return;
+  }
+  tb.innerHTML = r.data.clients.map((c) => `
+    <tr data-cid="${esc(c.clientId)}">
+      <td class="cell-name"><strong>${esc(c.name)}</strong></td>
+      <td><code>${esc(c.clientId)}</code></td>
+      <td><code>${esc(c.clientSecret)}</code></td>
+      <td class="cell-uri">${c.redirectUri ? esc(c.redirectUri) : '<span class="muted">不限制</span>'}</td>
+      <td class="muted">${esc(c.createdAt.replace('T', ' ').slice(0, 19))}</td>
+      <td>
+        <div class="client-actions">
+          <button class="btn btn-ghost" data-edit="${esc(c.clientId)}" data-name="${esc(c.name)}" data-uri="${esc(c.redirectUri || '')}" type="button">编辑</button>
+          <button class="btn btn-danger" data-del="${esc(c.clientId)}" type="button">删除</button>
+        </div>
+      </td>
+    </tr>`).join('');
+
+  tb.querySelectorAll('[data-del]').forEach((b) => {
+    b.onclick = async () => {
+      if (!confirm('确定删除该 OAuth 客户端？使用它的系统将无法再接入。')) return;
+      await API.del('/api/admin/oauth-clients', { clientId: b.dataset.del });
+      loadClients();
+    };
+  });
+
+  tb.querySelectorAll('[data-edit]').forEach((b) => {
+    b.onclick = () => startEditClient(b.dataset.edit, b.dataset.name, b.dataset.uri);
+  });
+}
+
+function startEditClient(clientId, name, redirectUri) {
+  const row = document.querySelector(`tr[data-cid="${esc(clientId)}"]`);
+  if (!row) return;
+  row.classList.add('edit-row');
+  const nameCell = row.querySelector('.cell-name');
+  const uriCell = row.querySelector('.cell-uri');
+  const actionsCell = row.querySelector('.client-actions').parentNode;
+
+  nameCell.innerHTML = `<input value="${esc(name)}" id="editName">`;
+  uriCell.innerHTML = `<input value="${esc(redirectUri)}" placeholder="https://..." id="editUri">`;
+  actionsCell.innerHTML = `
+    <div class="client-actions">
+      <button class="btn btn-primary" id="saveEdit" type="button">保存</button>
+      <button class="btn btn-ghost" id="cancelEdit" type="button">取消</button>
+    </div>`;
+
+  document.getElementById('saveEdit').onclick = async () => {
+    const err = document.getElementById('clientErr');
+    err.textContent = '';
+    const r = await API.put('/api/admin/oauth-clients', {
+      clientId,
+      name: document.getElementById('editName').value,
+      redirectUri: document.getElementById('editUri').value,
+    });
+    if (r.code === 200) loadClients();
+    else err.textContent = r.message || '更新失败';
+  };
+  document.getElementById('cancelEdit').onclick = () => loadClients();
+}
+
+document.getElementById('clientForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const err = document.getElementById('clientErr');
+  err.textContent = '';
+  const fd = new FormData(e.target);
+  const r = await API.post('/api/admin/oauth-clients', {
+    name: fd.get('name'),
+    redirectUri: fd.get('redirectUri'),
+  });
+  if (r.code === 200) { e.target.reset(); loadClients(); }
+  else err.textContent = r.message || '创建失败';
+};
+
+/* ---------- 系统设置 ---------- */
+async function loadSettings() {
+  const r = await API.get('/api/admin/settings');
+  if (r.code !== 200) return;
+  const form = document.getElementById('settingsForm');
+  form.mailAdminEmail.value = r.data.mailAdminEmail;
+  form.mailAdminPassword.value = '';
+  form.turnstileEnabled.value = r.data.turnstileEnabled ? '1' : '0';
+  form.emailVerifyMode.value = r.data.emailVerifyMode || 'auto';
+  document.getElementById('settingsInfo').innerHTML =
+    `邮箱服务：<code>${esc(r.data.mailApiBase)}</code> · 校园邮箱域：<code>@${esc(r.data.mailDomain)}</code>` +
+    (r.data.hasPassword ? ' · 密码已设置' : ' · <strong style="color:var(--danger)">未设置密码</strong>') +
+    ` · Turnstile 人机验证：${r.data.turnstileEnabled ? '<strong style="color:var(--success)">已开启</strong>' : '<span style="color:var(--muted)">已关闭</span>'}` +
+    ` · 邮箱验证：${r.data.emailVerifyEnabled ? '<strong style="color:var(--success)">启用中</strong>' : '<span style="color:var(--muted)">未启用</span>'}`;
+
+  const mail = r.data.mail || {};
+  const sForm = document.getElementById('smtpForm');
+  sForm.provider.value = mail.provider || 'mailchannels';
+  sForm.from.value = mail.from || '';
+  sForm.fromName.value = mail.fromName || '';
+  sForm.apiKey.value = '';
+  sForm.to.value = '';
+  document.getElementById('smtpInfo').innerHTML =
+    mail.from
+      ? `当前配置：<code>${esc(mail.provider)}</code> · 发件人 ${esc(mail.from)}` +
+        (mail.hasApiKey ? ' · API Key 已设置' : ' · <strong style="color:var(--danger)">未设置 API Key</strong>')
+      : '尚未配置邮件服务';
+}
+
+document.getElementById('settingsForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const err = document.getElementById('settingsErr');
+  const info = document.getElementById('settingsInfo');
+  err.textContent = '';
+  const btn = document.getElementById('settingsSave');
+  const fd = new FormData(e.target);
+  btn.disabled = true; btn.textContent = '保存并验证中…';
+  try {
+    const r = await API.post('/api/admin/settings', {
+      mailAdminEmail: fd.get('mailAdminEmail'),
+      mailAdminPassword: fd.get('mailAdminPassword') || '',
+      turnstileEnabled: fd.get('turnstileEnabled') === '1',
+      emailVerifyMode: fd.get('emailVerifyMode') || 'auto',
+    });
+    if (r.code === 200) {
+      const chk = r.data.tokenCheck;
+      if (chk && chk.ok) {
+        info.innerHTML = `<span style="color:var(--success)">✓ ${esc(r.message)}</span>`;
+      } else {
+        err.textContent = `${r.message}：${chk ? chk.error : '未知错误'}`;
+      }
+      loadSettings();
+    } else {
+      err.textContent = r.message || '保存失败';
+    }
+  } finally {
+    btn.disabled = false; btn.textContent = '保存设置';
+  }
+};
+
+/* SMTP 配置保存与测试 */
+function smtpPayload() {
+  const fd = new FormData(document.getElementById('smtpForm'));
+  return {
+    provider: fd.get('provider') || 'mailchannels',
+    from: fd.get('from'),
+    fromName: fd.get('fromName'),
+    apiKey: fd.get('apiKey') || '',
+    to: fd.get('to'),
+  };
+}
+
+document.getElementById('smtpForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const err = document.getElementById('smtpErr');
+  const info = document.getElementById('smtpInfo');
+  err.textContent = '';
+  const btn = document.getElementById('smtpSave');
+  btn.disabled = true; btn.textContent = '保存中…';
+  try {
+    const p = smtpPayload();
+    delete p.to;
+    const r = await API.post('/api/admin/settings/mail', p);
+    if (r.code === 200) {
+      info.innerHTML = `<span style="color:var(--success)">✓ ${esc(r.message)}</span>`;
+      loadSettings();
+    } else {
+      err.textContent = r.message || '保存失败';
+    }
+  } finally {
+    btn.disabled = false; btn.textContent = '保存邮件服务配置';
+  }
+};
+
+document.getElementById('smtpTest').onclick = async () => {
+  const err = document.getElementById('smtpErr');
+  const info = document.getElementById('smtpInfo');
+  err.textContent = '';
+  const btn = document.getElementById('smtpTest');
+  btn.disabled = true; btn.textContent = '发送中…';
+  try {
+    const r = await API.post('/api/admin/settings/test-mail', smtpPayload());
+    if (r.code === 200) info.innerHTML = `<span style="color:var(--success)">✓ ${esc(r.message)}</span>`;
+    else err.textContent = r.message || '测试失败';
+  } finally {
+    btn.disabled = false; btn.textContent = '发送测试邮件';
+  }
+};
+
+/* ---------- API 文档 ---------- */
+async function loadDocs() {
+  const r = await API.get('/api/docs');
+  if (r.code !== 200) return;
+  const d = r.data;
+  document.getElementById('baseUrl').textContent = d.baseUrl;
+  if (d.aiIntegrationNote) {
+    document.getElementById('docsIntro').innerHTML =
+      `<div class="doc-ai-note"><strong>给 AI 助手 / 智能体的集成说明</strong><pre class="doc-code">${esc(d.aiIntegrationNote)}</pre></div>`;
+  }
+  document.getElementById('docsBody').innerHTML = d.groups.map((g) => `
+    <div class="doc-group">
+      <h3>${esc(g.title)}</h3>
+      <p class="muted">${esc(g.desc)}</p>
+      ${g.items.map((it) => `
+        <div class="doc-item">
+          <div class="doc-item-head">
+            <span class="method-badge method-${esc(it.method)}">${esc(it.method)}</span>
+            <code>${esc(it.path)}</code>
+          </div>
+          <div class="doc-item-body">
+            <p>${esc(it.desc)}</p>
+            ${it.headers ? `<div class="doc-label">请求头</div><pre class="doc-code">${esc(it.headers)}</pre>` : ''}
+            ${it.params && it.params.length ? `
+              <div class="doc-label">请求参数</div>
+              <table class="data doc-params">
+                <thead><tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr></thead>
+                <tbody>${it.params.map((p) => `
+                  <tr><td><code>${esc(p.name)}</code></td><td>${esc(p.type)}</td>
+                  <td>${esc(p.required)}</td><td style="white-space:normal">${esc(p.desc)}</td></tr>`).join('')}
+                </tbody>
+              </table>` : ''}
+            ${it.example ? `<div class="doc-label">调用示例</div><pre class="doc-code">${esc(it.example)}</pre>` : ''}
+            ${it.response ? `<div class="doc-label">返回示例</div><pre class="doc-code">${esc(it.response)}</pre>` : ''}
+          </div>
+        </div>`).join('')}
+    </div>`).join('');
+}
+
+/* ---------- 初始化 ---------- */
+(async () => {
+  const me = await API.get('/api/auth/me');
+  if (me.code !== 200 || !me.data) { location.href = '/'; return; }
+  if (me.data.user.role !== 'admin') { location.href = '/app'; return; }
+  ME_USERNAME = me.data.user.username;
+  document.getElementById('userChip').innerHTML =
+    `<span class="avatar">${esc(ME_USERNAME.slice(0, 1).toUpperCase())}</span>` +
+    `<span class="uname">${esc(ME_USERNAME)}</span>` +
+    `<span class="role-tag">管理员</span>`;
+  loadUsers();
+  loadClients();
+  loadSettings();
+  loadDocs();
+})();
+</script>
+</body>
+</html>

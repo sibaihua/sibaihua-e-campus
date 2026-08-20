@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>我的E校园 · 司白画大学清迈分校</title>
+<link rel="icon" type="image/png" href="/crest.png">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body class="auth-page">
+<div class="auth-wrap">
+  <div class="auth-brand">
+    <div id="crestBox"></div>
+    <h1>司白画大学清迈分校</h1>
+    <div class="en">Sibaihua University · Chiang Mai Campus</div>
+    <div class="sys">我 的 E 校 园</div>
+  </div>
+
+  <div class="card auth-card">
+    <div class="tabs">
+      <button class="tab active" id="tabLogin" type="button">登 录</button>
+      <button class="tab" id="tabReg" type="button">注 册</button>
+    </div>
+
+    <!-- 登录 -->
+    <form id="loginForm" autocomplete="on">
+      <label class="field">
+        <span class="field-label">用户名</span>
+        <input name="username" placeholder="用户名或 用户名@gayg.de" required maxlength="60" autocomplete="username">
+      </label>
+      <label class="field">
+        <span class="field-label">密码</span>
+        <input name="password" type="password" placeholder="登录密码" required maxlength="64" autocomplete="current-password">
+      </label>
+      <p class="error" id="loginErr"></p>
+      <button class="btn btn-primary btn-block" type="submit" id="loginBtn">登 录</button>
+    </form>
+
+    <!-- 注册 -->
+    <form id="regForm" hidden autocomplete="on">
+      <div class="alert alert-info">
+        <strong>用户名规则：</strong>至少 3 位、不能为纯数字，建议使用<strong>英文姓名或其简拼</strong>（如 zhangsan、Zhang.San）。<br>
+        <strong>校园邮箱说明：</strong>注册成功并完成入学申请后，系统将自动开通校园邮箱
+        <strong>用户名@gayg.de</strong>。<strong>首次开通时邮箱密码与登录密码一致</strong>，此后两者为独立用户体系、密码互不同步。
+      </div>
+      <label class="field">
+        <span class="field-label">用户名 <em>*</em></span>
+        <div class="input-group">
+          <input name="username" id="regUsername" placeholder="至少 3 位，不能用纯数字" required maxlength="30" autocomplete="username">
+          <span class="suffix">@gayg.de</span>
+        </div>
+      </label>
+      <label class="field">
+        <span class="field-label">密码 <em>*</em></span>
+        <input name="password" type="password" placeholder="6-64 位，首次开通邮箱时与其一致" required maxlength="64" autocomplete="new-password">
+      </label>
+      <label class="field">
+        <span class="field-label">确认密码 <em>*</em></span>
+        <input name="password2" type="password" placeholder="再次输入密码" required maxlength="64" autocomplete="new-password">
+      </label>
+      <div class="field">
+        <div id="tsReg" class="ts-box"></div>
+      </div>
+      <p class="error" id="regErr"></p>
+      <button class="btn btn-primary btn-block" type="submit" id="regBtn">注 册</button>
+    </form>
+  </div>
+
+  <div class="auth-footer">One World, One Dream · © 2026 司白画大学清迈分校</div>
+</div>
+
+<script src="/js/common.js"></script>
+<script>
+'use strict';
+document.getElementById('crestBox').innerHTML = crestImg(80);
+
+const tabLogin = document.getElementById('tabLogin');
+const tabReg = document.getElementById('tabReg');
+const loginForm = document.getElementById('loginForm');
+const regForm = document.getElementById('regForm');
+
+function switchTab(isLogin) {
+  tabLogin.classList.toggle('active', isLogin);
+  tabReg.classList.toggle('active', !isLogin);
+  loginForm.hidden = !isLogin;
+  regForm.hidden = isLogin;
+  // 切换到注册表单时按后台开关渲染人机验证小部件
+  if (!isLogin) maybeRenderTurnstile('tsReg');
+}
+tabLogin.onclick = () => switchTab(true);
+tabReg.onclick = () => switchTab(false);
+
+const nextUrl = new URLSearchParams(location.search).get('next');
+
+function afterAuth(r) {
+  if (r.code === 200 && r.data && r.data.token) {
+    API.token = r.data.token;
+    location.href = nextUrl || '/app';
+    return true;
+  }
+  return false;
+}
+
+loginForm.onsubmit = async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('loginBtn');
+  const err = document.getElementById('loginErr');
+  err.textContent = '';
+  btn.disabled = true; btn.textContent = '登录中…';
+  try {
+    const fd = new FormData(loginForm);
+    const r = await API.post('/api/auth/login', {
+      username: fd.get('username'),
+      password: fd.get('password'),
+    });
+    if (!afterAuth(r)) err.textContent = r.message || '登录失败';
+  } finally {
+    btn.disabled = false; btn.textContent = '登 录';
+  }
+};
+
+regForm.onsubmit = async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('regBtn');
+  const err = document.getElementById('regErr');
+  err.textContent = '';
+  const fd = new FormData(regForm);
+  const pw = fd.get('password');
+  const username = String(fd.get('username') || '').trim().toLowerCase();
+  if (username.length < 3) { err.textContent = '用户名至少 3 位'; return; }
+  if (/^\d+$/.test(username)) { err.textContent = '用户名不能为纯数字，建议使用英文姓名或其简拼'; return; }
+  if (pw !== fd.get('password2')) { err.textContent = '两次输入的密码不一致'; return; }
+  const cfg = await getPublicConfig();
+  let ts = '';
+  if (cfg.turnstileEnabled) {
+    ts = tsToken('tsReg');
+    if (!ts) { err.textContent = '请先完成人机验证'; return; }
+  }
+  btn.disabled = true; btn.textContent = '注册中…';
+  try {
+    const r = await API.post('/api/auth/register', {
+      username,
+      password: pw,
+      cfTurnstileToken: ts,
+    });
+    if (!afterAuth(r)) {
+      err.textContent = r.message || '注册失败';
+      if (cfg.turnstileEnabled) tsReset('tsReg');
+    }
+  } finally {
+    btn.disabled = false; btn.textContent = '注 册';
+  }
+};
+
+// 已登录用户直接进入后台
+(async () => {
+  if (!API.token) return;
+  const me = await API.get('/api/auth/me');
+  if (me.code === 200) location.href = nextUrl || '/app';
+})();
+</script>
+</body>
+</html>

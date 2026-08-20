@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>我的E校园 · 司白画大学清迈分校</title>
+<link rel="icon" type="image/png" href="/crest.png">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<nav class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="/app" id="brandBox"></a>
+    <div class="topbar-right">
+      <a href="/admin" class="toplink" id="adminLink" hidden>管理后台</a>
+      <span class="user-chip" id="userChip"></span>
+      <button class="btn btn-ghost btn-sm" id="logoutBtn" type="button">退出登录</button>
+    </div>
+  </div>
+</nav>
+
+<main class="container" id="main">
+  <div class="loading">正在加载 …</div>
+</main>
+
+<script src="/js/common.js"></script>
+<script>
+'use strict';
+renderBrand(document.getElementById('brandBox'));
+document.getElementById('logoutBtn').onclick = logout;
+
+const state = { user: null, captchaId: null, emailSent: false, pubCfg: null };
+const main = document.getElementById('main');
+
+/* 密码体系提示（首次开通邮箱时展示） */
+const PASSWORD_NOTE = '温馨提示：首次开通校园邮箱时，邮箱密码与「我的E校园」登录密码一致；此后两者为相互独立的用户体系，密码互不同步，请分别妥善保管。';
+
+const CHECK_SVG = `
+<svg class="success-icon" width="76" height="76" viewBox="0 0 76 76" aria-hidden="true">
+  <circle cx="38" cy="38" r="36" fill="#e9f6f0" stroke="#1e6e4f" stroke-width="2.5"/>
+  <path d="M24 39.5 L34 49 L53 28.5" fill="none" stroke="#1e6e4f" stroke-width="5"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;
+
+const GLOBE_SVG = `
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1E3A5F" stroke-width="1.8" aria-hidden="true">
+  <circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.8 2.6 2.8 15.4 0 18M12 3c-2.8 2.6-2.8 15.4 0 18"/>
+</svg>`;
+
+const MAIL_SVG = `
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1E3A5F" stroke-width="1.8" aria-hidden="true">
+  <rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>
+</svg>`;
+
+/* ---------- 菜单 ---------- */
+function renderMenu() {
+  main.innerHTML = `
+    <div class="tabs user-tabs">
+      <button class="tab active" data-panel="apply" type="button">入学申请</button>
+      <button class="tab" data-panel="profile" type="button">个人设置</button>
+      <button class="tab" data-panel="account" type="button">账号信息</button>
+    </div>
+    <section id="panel-apply"></section>
+    <section id="panel-profile" hidden></section>
+    <section id="panel-account" hidden></section>`;
+
+  document.querySelectorAll('.user-tabs .tab').forEach((t) => {
+    t.onclick = () => {
+      document.querySelectorAll('.user-tabs .tab').forEach((x) => x.classList.remove('active'));
+      t.classList.add('active');
+      ['apply', 'profile', 'account'].forEach((k) => {
+        document.getElementById('panel-' + k).hidden = k !== t.dataset.panel;
+      });
+    };
+  });
+}
+
+/* ---------- 顶部用户信息 ---------- */
+function renderChip() {
+  const u = state.user;
+  document.getElementById('userChip').innerHTML =
+    `<span class="avatar">${esc(u.username.slice(0, 1).toUpperCase())}</span>` +
+    `<span class="uname">${esc(u.username)}</span>` +
+    (u.role === 'admin' ? '<span class="role-tag">管理员</span>' : '');
+  document.getElementById('adminLink').hidden = u.role !== 'admin';
+}
+
+/* ---------- 图形验证码 ---------- */
+async function loadCaptcha() {
+  const r = await API.get('/api/captcha');
+  if (r.code !== 200) return;
+  state.captchaId = r.data.captchaId;
+  const box = document.getElementById('captchaBox');
+  if (box) box.innerHTML = r.data.image;
+}
+
+/* ---------- 主渲染 ---------- */
+function render() {
+  renderChip();
+  renderMenu();
+  const u = state.user;
+  renderPanel('apply', u.role === 'admin' ? renderAdminCard() : (u.status === 'approved' ? renderApproved() : renderApplyForm()));
+  renderPanel('profile', renderProfile());
+  renderPanel('account', renderAccount());
+}
+
+function renderPanel(name, html) {
+  const el = document.getElementById('panel-' + name);
+  if (el) el.innerHTML = html;
+}
+
+function renderAdminCard() {
+  return `
+    <section class="card main-card center">
+      ${CHECK_SVG}
+      <h2 class="success-title">管理员账户</h2>
+      <p class="muted">你以管理员身份登录，无需提交入学申请。<br>可前往管理后台查看用户、OAuth 客户端与系统设置。</p>
+      <p style="margin-top:22px"><a class="btn btn-primary" href="/admin">进入管理后台</a></p>
+    </section>`;
+}
+
+/* ---------- 入学申请通过 ---------- */
+function renderApproved() {
+  const u = state.user;
+  return `
+    <section class="card main-card">
+      <div class="center">
+        ${CHECK_SVG}
+        <h2 class="success-title">入学申请通过</h2>
+        <p class="muted">恭喜你，<strong>${esc(u.englishName || u.username)}</strong>！<br>
+          你已被司白画大学清迈分校正式录取，校园账号已自动开通：</p>
+        <div class="account-card">
+          <div class="account-row"><span>校园邮箱</span>
+            <strong>${esc(u.emailAccount || u.username + '@gayg.de')}
+              <button class="copy-btn" type="button" id="copyMail">复制</button></strong></div>
+          <div class="account-row"><span>邮箱密码</span><strong>首次开通时与本系统登录密码一致</strong></div>
+        </div>
+      </div>
+      <div class="alert alert-info">${PASSWORD_NOTE}</div>
+      <div class="link-cards">
+        <a class="link-card" href="https://sibaihua.com/" target="_blank" rel="noopener">
+          <span class="link-icon">${GLOBE_SVG}</span>
+          <span><strong>校园官网</strong><small>sibaihua.com</small></span>
+          <span class="arrow">↗</span>
+        </a>
+        <a class="link-card" href="https://gayg.de/" target="_blank" rel="noopener">
+          <span class="link-icon">${MAIL_SVG}</span>
+          <span><strong>校园邮箱</strong><small>gayg.de</small></span>
+          <span class="arrow">↗</span>
+        </a>
+      </div>
+    </section>`;
+}
+
+/* ---------- 入学申请表单（邮箱验证为可选功能） ---------- */
+function renderApplyForm() {
+  const u = state.user;
+  const emailVerifyOn = !!(state.pubCfg && state.pubCfg.emailVerifyEnabled);
+  const failTip = u.status === 'failed' && u.applyError
+    ? `<div class="alert alert-danger">上次申请时校园邮箱开通失败：${esc(u.applyError)}<br>请核对信息后重新提交。</div>` : '';
+
+  const mail = u.contactEmail || '';
+  const mailVerified = !!u.emailVerified && !!mail;
+
+  const emailRow = emailVerifyOn
+    ? `
+        <div class="email-verify-row">
+          <input name="contactEmail" id="contactEmail" type="email" placeholder="用于接收录取通知的个人邮箱" required maxlength="100" value="${esc(mail)}" ${mailVerified ? 'disabled' : ''}>
+          <button class="btn btn-ghost" type="button" id="sendCodeBtn" ${mailVerified ? 'disabled' : ''}>发送验证码</button>
+        </div>
+        <div id="emailVerifyBox" style="margin-top:10px"></div>`
+    : `
+        <div class="email-verify-row">
+          <input name="contactEmail" id="contactEmail" type="email" placeholder="用于接收录取通知的个人邮箱" required maxlength="100" value="${esc(mail)}" ${mailVerified ? 'disabled' : ''}>
+          <span class="badge badge-registered" style="white-space:nowrap">无需验证</span>
+        </div>
+        <div class="captcha-hint" style="margin-top:8px">当前未启用邮箱验证功能，直接填写个人联系邮箱即可提交申请。</div>`;
+
+  return `
+    <section class="card main-card">
+      <div class="card-head">
+        <h2>入学申请</h2>
+        <p class="muted">填写英文姓名与个人联系邮箱提交申请。申请提交后<strong>自动审核通过</strong>，系统将立即为你开通校园邮箱
+          <strong>${esc(u.username)}@gayg.de</strong>。</p>
+      </div>
+      ${failTip}
+      <form id="applyForm">
+        <label class="field">
+          <span class="field-label">英文姓名（Full Name in English）<em>*</em></span>
+          <input name="englishName" placeholder="如：San Zhang" required maxlength="60" value="${esc(u.englishName)}">
+        </label>
+
+        <div class="field">
+          <span class="field-label">个人联系邮箱（Contact Email）<em>*</em></span>
+          ${emailRow}
+        </div>
+
+        <div class="field">
+          <span class="field-label">图形验证码 <em>*</em></span>
+          <div class="captcha-row">
+            <div class="captcha-box" id="captchaBox" title="点击刷新验证码"></div>
+            <input name="captchaCode" placeholder="输入左侧字符" required maxlength="6" autocomplete="off">
+          </div>
+          <div class="captcha-hint">看不清？点击图片刷新</div>
+        </div>
+
+        <div class="field">
+          <div id="tsApply" class="ts-box"></div>
+        </div>
+
+        <p class="error" id="formErr"></p>
+        <button class="btn btn-primary btn-block" type="submit" id="applyBtn">提交入学申请</button>
+      </form>
+    </section>`;
+}
+
+/* 邮箱验证区域（在申请表单 / 个人设置中复用）
+ * container: 提示区容器 id；emailInput: 邮箱输入框 id；sendBtnId: 发送按钮 id */
+function renderEmailVerify(container, { emailInput, sendBtnId, onVerified }) {
+  const u = state.user;
+  const box = document.getElementById(container);
+  if (!box) return;
+  const verified = !!u.emailVerified && !!u.contactEmail;
+
+  if (verified) {
+    box.innerHTML = `<div class="alert alert-success" style="margin:0">✓ 邮箱 <strong>${esc(u.contactEmail)}</strong> 已验证通过</div>`;
+    return;
+  }
+  const sendBtn = document.getElementById(sendBtnId);
+  box.innerHTML = `
+    <div class="email-code-row">
+      <input id="emailCode" placeholder="输入邮件中的 6 位验证码" maxlength="6" autocomplete="off">
+      <button class="btn btn-ghost" type="button" id="confirmCodeBtn">验证</button>
+    </div>
+    <div class="captcha-hint" id="emailVerifyHint"></div>`;
+
+  const hint = document.getElementById('emailVerifyHint');
+  const send = async () => {
+    const email = document.getElementById(emailInput).value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      hint.textContent = '请输入有效的邮箱地址'; hint.style.color = 'var(--danger)'; return;
+    }
+    sendBtn.disabled = true; sendBtn.textContent = '发送中…';
+    const r = await API.post('/api/verify-email/send', { email });
+    if (r.code === 200) {
+      hint.textContent = '验证码已发送，请查收邮件（10 分钟内有效）'; hint.style.color = 'var(--success)';
+    } else {
+      hint.textContent = r.message || '发送失败'; hint.style.color = 'var(--danger)';
+    }
+    sendBtn.disabled = false; sendBtn.textContent = '重新发送';
+  };
+  if (sendBtn) sendBtn.onclick = send;
+
+  document.getElementById('confirmCodeBtn').onclick = async () => {
+    const email = document.getElementById(emailInput).value.trim();
+    const code = document.getElementById('emailCode').value.trim();
+    if (!code) { hint.textContent = '请输入验证码'; hint.style.color = 'var(--danger)'; return; }
+    const r = await API.post('/api/verify-email/confirm', { email, code });
+    if (r.code === 200 && r.data && r.data.user) {
+      state.user = r.data.user;
+      render();
+      if (onVerified) onVerified();
+    } else {
+      hint.textContent = r.message || '验证失败'; hint.style.color = 'var(--danger)';
+    }
+  };
+}
+
+/* ---------- 个人设置 ---------- */
+function renderProfile() {
+  const u = state.user;
+  const emailVerifyOn = !!(state.pubCfg && state.pubCfg.emailVerifyEnabled);
+  const emailBlock = emailVerifyOn
+    ? `
+      <div class="field">
+        <span class="field-label">当前联系邮箱</span>
+        <div class="email-verify-row">
+          <input id="profileContactEmail" type="email" maxlength="100" value="${esc(u.contactEmail || '')}" placeholder="输入新的联系邮箱">
+          <button class="btn btn-ghost" type="button" id="profileSendCodeBtn">发送验证码</button>
+        </div>
+        <div id="profileEmailVerifyBox" style="margin-top:10px"></div>
+      </div>`
+    : `
+      <div class="field">
+        <span class="field-label">当前联系邮箱</span>
+        <input id="profileContactEmail" type="email" maxlength="100" value="${esc(u.contactEmail || '')}" placeholder="输入个人联系邮箱（无需验证）">
+        <div class="captcha-hint" style="margin-top:8px">当前未启用邮箱验证功能，保存后直接生效。</div>
+      </div>`;
+  return `
+    <section class="card main-card">
+      <div class="card-head"><h2>个人设置 · 登录密码</h2>
+        <p class="muted">仅修改「我的E校园」登录密码，校园邮箱密码不受影响（两者为独立用户体系）。</p></div>
+      <form id="pwForm">
+        <label class="field"><span class="field-label">原密码 <em>*</em></span>
+          <input name="oldPassword" type="password" required maxlength="64" autocomplete="current-password"></label>
+        <label class="field"><span class="field-label">新密码 <em>*</em></span>
+          <input name="newPassword" type="password" required maxlength="64" placeholder="6-64 位" autocomplete="new-password"></label>
+        <label class="field"><span class="field-label">确认新密码 <em>*</em></span>
+          <input name="newPassword2" type="password" required maxlength="64" autocomplete="new-password"></label>
+        <p class="error" id="pwErr"></p>
+        <button class="btn btn-primary" type="submit">修改密码</button>
+      </form>
+    </section>
+
+    <section class="card main-card" style="margin-top:22px">
+      <div class="card-head"><h2>个人设置 · 联系邮箱</h2>
+        <p class="muted">${emailVerifyOn ? '修改个人联系邮箱需重新通过邮件验证。' : '当前为免验证模式：填写后点击保存即可更新联系邮箱。'}</p></div>
+      ${emailBlock}
+      <p class="error" id="profileErr" style="margin-top:10px"></p>
+      <button class="btn btn-primary" type="button" id="profileEmailSave" style="margin-top:6px">保存联系邮箱</button>
+    </section>`;
+}
+
+function bindProfile() {
+  const pwForm = document.getElementById('pwForm');
+  if (pwForm) {
+    pwForm.onsubmit = async (e) => {
+      e.preventDefault();
+      const err = document.getElementById('pwErr');
+      err.textContent = '';
+      const fd = new FormData(pwForm);
+      if (fd.get('newPassword') !== fd.get('newPassword2')) { err.textContent = '两次输入的新密码不一致'; return; }
+      const r = await API.post('/api/auth/change-password', {
+        oldPassword: fd.get('oldPassword'),
+        newPassword: fd.get('newPassword'),
+      });
+      if (r.code === 200) { pwForm.reset(); err.style.color = 'var(--success)'; err.textContent = r.message; }
+      else { err.style.color = ''; err.textContent = r.message || '修改失败'; }
+    };
+  }
+  const emailVerifyOn = !!(state.pubCfg && state.pubCfg.emailVerifyEnabled);
+  if (emailVerifyOn) {
+    renderEmailVerify('profileEmailVerifyBox', {
+      emailInput: 'profileContactEmail',
+      sendBtnId: 'profileSendCodeBtn',
+      onVerified: () => {},
+    });
+  } else {
+    // 免验证模式：直接保存联系邮箱
+    const saveBtn = document.getElementById('profileEmailSave');
+    if (saveBtn) {
+      saveBtn.onclick = async () => {
+        const err = document.getElementById('profileErr');
+        err.textContent = '';
+        const email = document.getElementById('profileContactEmail').value.trim().toLowerCase();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err.textContent = '请输入有效的邮箱地址'; return; }
+        // 复用管理员更新接口中的邮箱逻辑：这里调用 apply 同款校验不可行，改为公开的用户邮箱更新接口
+        const r = await API.post('/api/profile/contact-email', { contactEmail: email });
+        if (r.code === 200 && r.data && r.data.user) {
+          state.user = r.data.user;
+          err.style.color = 'var(--success)'; err.textContent = '联系邮箱已更新';
+          render();
+        } else {
+          err.style.color = ''; err.textContent = r.message || '保存失败';
+        }
+      };
+    }
+  }
+}
+
+/* ---------- 账号信息 ---------- */
+function renderAccount() {
+  const u = state.user;
+  const rows = [
+    ['用户名', u.username],
+    ['英文姓名', u.englishName || '—'],
+    ['个人联系邮箱', u.contactEmail ? `${u.contactEmail} ${u.emailVerified ? '<span class="badge badge-approved">已验证</span>' : '<span class="badge badge-registered">未验证</span>'}` : '—'],
+    ['账号状态', u.status === 'approved' ? '已录取' : (u.status === 'failed' ? '开户失败' : '待申请')],
+    ['校园邮箱', u.emailAccount || (u.role === 'admin' ? '管理员账号' : '—')],
+    ['注册时间', u.createdAt.replace('T', ' ').slice(0, 19)],
+    ['申请时间', u.appliedAt ? u.appliedAt.replace('T', ' ').slice(0, 19) : '—'],
+  ];
+  return `
+    <section class="card main-card">
+      <div class="card-head"><h2>账号信息</h2>
+        <p class="muted">以下信息可同步用于其他校园系统（通过 OAuth 统一登录）。</p></div>
+      <div class="account-card" style="text-align:left">
+        ${rows.map(([k, v]) => `<div class="account-row"><span>${k}</span><strong>${v}</strong></div>`).join('')}
+      </div>
+    </section>`;
+}
+
+/* ---------- 申请表单事件 ---------- */
+function bindApplyForm() {
+  const form = document.getElementById('applyForm');
+  if (!form) return;
+  const box = document.getElementById('captchaBox');
+  if (box) box.onclick = loadCaptcha;
+  loadCaptcha();
+  maybeRenderTurnstile('tsApply');
+  renderEmailVerify('emailVerifyBox', { emailInput: 'contactEmail', sendBtnId: 'sendCodeBtn', onVerified: () => {} });
+
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('applyBtn');
+    const err = document.getElementById('formErr');
+    err.textContent = '';
+    const fd = new FormData(form);
+    const contactEmail = fd.get('contactEmail');
+    const cfg = state.pubCfg || await getPublicConfig();
+    if (cfg.emailVerifyEnabled && (!state.user.emailVerified || state.user.contactEmail !== contactEmail)) {
+      err.textContent = '请先完成个人联系邮箱验证';
+      return;
+    }
+    let ts = '';
+    if (cfg.turnstileEnabled) {
+      ts = tsToken('tsApply');
+      if (!ts) { err.textContent = '请先完成人机验证'; return; }
+    }
+    btn.disabled = true; btn.textContent = '正在提交申请…';
+    try {
+      const r = await API.post('/api/apply', {
+        englishName: fd.get('englishName'),
+        contactEmail,
+        captchaId: state.captchaId,
+        captchaCode: fd.get('captchaCode'),
+        cfTurnstileToken: ts,
+      });
+      if (r.code === 200 && r.data && r.data.user) {
+        state.user = r.data.user;
+        render();
+      } else {
+        err.textContent = r.message || '申请失败，请重试';
+        state.captchaId = null;
+        loadCaptcha();
+        if (cfg.turnstileEnabled) tsReset('tsApply');
+      }
+    } finally {
+      btn.disabled = false; btn.textContent = '提交入学申请';
+    }
+  };
+}
+
+/* ---------- 初始化 ---------- */
+(async () => {
+  state.pubCfg = await getPublicConfig();
+  const me = await API.get('/api/auth/me');
+  if (me.code !== 200 || !me.data) { location.href = '/'; return; }
+  state.user = me.data.user;
+  render();
+  bindApplyForm();
+  bindProfile();
+})();
+</script>
+</body>
+</html>
