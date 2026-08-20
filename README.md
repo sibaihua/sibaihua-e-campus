@@ -60,33 +60,28 @@ git push -u origin main
 3. 构建设置保持默认（自动识别 `wrangler.toml`），点击 **Save and Deploy**
 4. 部署完成，即可访问 `https://sibaihua-e-campus.<你的子域>.workers.dev/`
 
-## 三、绑定 D1 数据库（控制台操作，无命令）
+## 三、绑定 D1 数据库（已内置，无需手动操作）
 
-1. 先创建数据库：控制台 → **D1**（左侧菜单）→ **Create database** → 名称填 `sibaihua-e-campus` → Create
-2. 回到 Worker 详情页 → **Settings → Bindings → Add**
-3. 类型选 **D1 Database**：
-   - **Variable name：`DB`**（必须与代码一致）
-   - Database：选择刚创建的 `sibaihua-e-campus`
-4. Save，然后 **Deploy**（重新部署一次使绑定生效）
+**D1 绑定已写死在 `wrangler.toml` 里**（binding 名 `DB`，含你的 database_id），随代码一起部署，**不会被构建重置**。
 
-✅ 完成。首次访问任意 API（如打开登录页触发注册接口）时，Worker 会自动执行建表 SQL（幂等，重复执行无害），并自动创建管理员账号 `iam`（密码见 `SEED_ADMIN_PASSWORD`，未设置时为 `858308533`，登录后请立即在「个人设置」改掉）。
+你只需在首次部署前确认一件事：控制台 **D1** 页面里存在名为 `sibaihua-e-campus` 的数据库（若没有，左侧 D1 → Create database 创建即可，名称必须一致）。
+
+> ⚠️ **重要机制**：Cloudflare 的 Git 集成（Workers Builds）每次构建部署时，会按 `wrangler.toml` 重置 Worker 的绑定和**普通变量**——所以绑定与默认变量都写在配置里；敏感值必须用 **Secret** 类型添加（见下节），否则下次构建就会被清空。
+
+✅ 部署后首次访问任意 API 时，Worker 会自动执行建表 SQL（幂等），并自动创建管理员账号 `iam`（密码见 `SEED_ADMIN_PASSWORD`，未设置时为 `858308533`，登录后请立即在「个人设置」改掉）。
 
 ## 四、后台设置环境变量（控制台操作）
 
-Worker 详情页 → **Settings → Variables**，逐个 **Add**：
+Worker 详情页 → **Settings → Variables** → **Add**。**关键：敏感值类型必须选 `Secret`，不要用普通变量（普通变量会被每次 Git 构建清空）**：
 
-| 变量名 | 必填 | 说明 | 示例值 |
+| 变量名 | 类型 | 必填 | 说明 |
 |---|---|---|---|
-| `SECRET` | **强烈建议** | 密码加密密钥，生产环境务必改为 ≥32 位随机串 | `随机生成一串长字符串` |
-| `SEED_ADMIN_PASSWORD` | 否 | 首次部署自动创建的管理员 `iam` 的密码（默认 `858308533`，部署后请务必在后台改掉） | `自定义强密码` |
-| `TURNSTILE_SECRET` | 建议 | Turnstile 服务端密钥（若用官方面板默认密钥可留空） | `0x4A...` |
-| `TURNSTILE_SITE_KEY` | 否 | Turnstile 站点密钥（前端已内置默认值） | `0x4A...` |
-| `MAILCHANNELS_API_KEY` | 否 | MailChannels 密钥（也可在管理后台填写） | `mc_...` |
-| `MAIL_FROM` | 否 | 默认发件邮箱 | `no-reply@sibh.cn` |
-| `MAIL_FROM_NAME` | 否 | 默认发件人名称 | `司白画大学清迈分校 · 我的E校园` |
-| `MAIL_API_BASE` | 否 | Cloud Mail 服务地址 | `https://gayg.de` |
+| `SECRET` | **Secret** | **强烈建议** | 密码加密密钥，生产环境务必改为 ≥32 位随机串 |
+| `TURNSTILE_SECRET` | **Secret** | 建议 | Turnstile 服务端密钥（若用官方面板默认密钥可留空） |
+| `MAILCHANNELS_API_KEY` | **Secret** | 否 | MailChannels 密钥（也可在管理后台填写） |
+| `SEED_ADMIN_PASSWORD` | **Secret** | 否 | 首次部署自动创建的管理员 `iam` 的密码（默认 `858308533`） |
 
-除 `SECRET` 外均非必需——不设置也能跑通注册/登录/申请全流程（邮件服务与管理邮箱在系统后台填写）。
+> 其余默认变量（`TURNSTILE_SITE_KEY`、`MAIL_API_BASE`、`MAIL_FROM`、`MAIL_FROM_NAME`）已内置在 `wrangler.toml`，**无需在控制台添加**；如确实要覆盖，改仓库里的 `wrangler.toml` 再 push 即可（控制台改会被构建覆盖）。
 
 ## 五、发信与邮箱验证（可选功能）
 
@@ -134,7 +129,8 @@ npm run dev                        # http://localhost:8787/
 ## 常见问题
 
 - **OAuth 在 Worker 上能用吗？** 完全可用。OAuth 2.0（密码模式 / 授权码模式 / userinfo）是纯 HTTP 接口，不依赖文件系统与 SMTP，已在本项目本地环境完整验证：授权页预检 → 用户授权签发 code → code 换 access_token（一次性）→ userinfo。其他校园系统按「API 接口文档」接入即可；唯一注意回调地址 `redirect_uri` 需为 https（Worker 强制 HTTPS）。
-- **注册提示「数据库未就绪」**：未绑定 D1 或绑定名不是 `DB` → 按第三节操作后重新 Deploy。
+- **部署后绑定/普通变量被清空？** Git 集成（Workers Builds）每次构建会用 `wrangler.toml` 重置绑定和普通变量——D1 绑定与默认变量已内置在配置里；敏感值请以 **Secret** 类型添加（构建不会清除 Secret）。
+- **注册提示「数据库未就绪」**：确认控制台 D1 里数据库名是否为 `sibaihua-e-campus`（与 wrangler.toml 的 `database_name` 一致），不一致会绑定失败。
 - **注册提示「人机验证未通过」**：`TURNSTILE_SECRET` 未配置或与站点密钥不配套；管理后台可临时关闭 Turnstile 排查。
 - **学生申请被要求验证邮箱但发不出验证码**：管理后台「系统设置 · 邮箱验证功能」切到「自动/关闭」，或先配置邮件服务。
 - **验证码邮件收不到**：先到管理后台「系统设置 · 邮件服务」发测试邮件；确认 MailChannels 域名 TXT 验证已生效。
