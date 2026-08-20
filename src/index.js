@@ -940,7 +940,7 @@ async function apiDocs(ctx) {
             { name: 'englishName', type: 'string', required: '否', desc: '英文姓名' },
             { name: 'contactEmail', type: 'string', required: '否', desc: '联系邮箱' },
           ], response: '{ "code": 200, "message": "用户已创建", "data": { "user": { ... } } }' },
-          { method: 'PUT', path: '/api/admin/users', desc: '编辑用户。所有字段均可选，只传需要修改的。修改用户名会同步更新已开通的校园邮箱前缀；修改密码会同时更新登录密码与邮箱开户密码。', headers: 'Authorization: Bearer <管理员会话令牌>', params: [
+          { method: 'PUT', path: '/api/admin/users', desc: '编辑用户。所有字段均可选，只传需要修改的。修改用户名会同步更新系统中记录的校园邮箱前缀（仅系统记录，gayg.de 上的真实邮箱地址不会改变）；修改密码只更新「我的E校园」登录密码（哈希与密文），gayg.de 校园邮箱的真实密码不受影响——两者为相互独立的用户体系。', headers: 'Authorization: Bearer <管理员会话令牌>', params: [
             { name: 'id', type: 'integer', required: '是', desc: '用户 ID' },
             { name: 'username', type: 'string', required: '否', desc: '新用户名（不能与现有用户重复）' },
             { name: 'password', type: 'string', required: '否', desc: '新密码（6-64 位，不传或空则不修改）' },
