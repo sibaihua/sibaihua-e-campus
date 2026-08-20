@@ -21,10 +21,8 @@
 <div class="auth-page">
   <div class="auth-wrap oauth-wrap">
     <div class="auth-brand">
-      <div id="crestBox"></div>
-      <h1>司白画大学清迈分校</h1>
-      <div class="en">Sibaihua University · Chiang Mai Campus</div>
       <div class="sys">统 一 账 号 授 权</div>
+      <div class="welcome">授权后即可使用校园服务，全程安全可控</div>
     </div>
 
     <div class="card oauth-card" id="oauthCard">
@@ -39,7 +37,6 @@
 <script>
 'use strict';
 renderBrand(document.getElementById('brandBox'));
-document.getElementById('crestBox').innerHTML = crestImg(72);
 
 const q = new URLSearchParams(location.search);
 const clientId = q.get('client_id') || '';
