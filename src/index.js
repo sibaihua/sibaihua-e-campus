@@ -852,7 +852,7 @@ async function hOauthUserinfo(ctx) {
 async function apiDocs(ctx) {
   const base = ctx.env.SITE_URL || `https://${ctx.request.headers.get('host') || 'localhost'}`;
   const domain = await mailDomain(ctx.env);
-  return {
+  return ok({
     baseUrl: base,
     mailDomain: domain,
     updatedAt: new Date().toISOString(),
@@ -987,7 +987,7 @@ async function apiDocs(ctx) {
         ],
       },
     ],
-  };
+  });
 }
 
 /* ============================== 路由 ============================== */
