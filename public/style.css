@@ -374,7 +374,20 @@ pre.doc-code {
   .main-card { padding: 26px 20px; }
   .link-cards { grid-template-columns: 1fr; }
   .auth-card { padding: 24px 20px; }
-  .topbar-inner { padding: 0 14px; }
-  .brand .brand-text strong { font-size: 14px; }
+  .topbar-inner { height: 54px; padding: 0 10px; gap: 8px; }
+  .brand { gap: 8px; min-width: 0; }
+  .brand .crest { width: 30px !important; height: 30px !important; }
+  .brand .brand-text { min-width: 0; }
+  .brand .brand-text small { display: none; }
+  .brand .brand-text strong { font-size: 13.5px; letter-spacing: 0.5px; white-space: nowrap; }
+  .topbar-right { gap: 6px; min-width: 0; }
+  .topbar .toplink { padding: 6px 8px; font-size: 12.5px; }
+  .user-chip { padding: 3px 9px 3px 3px; gap: 6px; }
+  .user-chip .avatar { width: 22px; height: 22px; font-size: 11px; }
+  .user-chip .uname { max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .user-chip .role-tag { padding: 1px 6px; font-size: 10px; }
+  .btn-sm { padding: 6px 10px; font-size: 12px; }
   .auth-brand h1 { font-size: 20px; }
+  .admin-tabs, .user-tabs { gap: 6px; }
+  .admin-tabs .tab, .user-tabs .tab { padding: 8px 14px; font-size: 13.5px; }
 }
