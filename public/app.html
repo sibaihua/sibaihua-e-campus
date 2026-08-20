@@ -317,7 +317,7 @@ function renderProfile() {
         <span class="field-label">头像图片链接</span>
         <div class="email-verify-row">
           <input id="profileAvatar" type="url" maxlength="500" value="${esc(u.avatarUrl || '')}" placeholder="https://example.com/avatar.png">
-          <span class="avatar" id="avatarPreview" style="width:38px;height:38px;font-size:16px">${esc((u.username || 'A').slice(0, 1).toUpperCase())}</span>
+          <span class="avatar" id="avatarPreview" style="width:38px;height:38px;font-size:16px"><img src="${LOGO_URL}" alt=""></span>
         </div>
         <div class="captcha-hint">支持 http(s) 链接；填写后下方可预览，留空保存则清除头像</div>
       </div>
@@ -371,18 +371,14 @@ function bindProfile() {
     }
   }
 
-  // 头像：预览 + 保存
+  // 头像：预览 + 保存（预览图限定在 38px 圆内，防止大图溢出）
   const avatarInput = document.getElementById('profileAvatar');
   const avatarPreview = document.getElementById('avatarPreview');
-  const initial = esc((state.user.username || 'A').slice(0, 1).toUpperCase());
   if (avatarInput && avatarPreview) {
     const updatePreview = () => {
       const v = avatarInput.value.trim();
-      if (v && /^https?:\/\//i.test(v)) {
-        avatarPreview.innerHTML = `<img src="${esc(v)}" alt="" onerror="this.outerHTML='${initial}'">`;
-      } else {
-        avatarPreview.textContent = initial;
-      }
+      const src = v && /^https?:\/\//i.test(v) ? v : LOGO_URL;
+      avatarPreview.innerHTML = `<img src="${esc(src)}" alt="" onerror="this.outerHTML='<span class=\\'avatar\\' style=\\'width:38px;height:38px;font-size:16px\\'>${esc((state.user.username || 'A').slice(0, 1).toUpperCase())}</span>'">`;
     };
     avatarInput.addEventListener('input', updatePreview);
     const saveAvatarBtn = document.getElementById('profileAvatarSave');

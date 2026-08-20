@@ -93,7 +93,7 @@ code { font-family: Consolas, "Courier New", monospace; background: var(--navy-p
 .auth-brand { text-align: center; margin-bottom: 26px; color: #fff; }
 .auth-brand .crest { margin-bottom: 14px; border-radius: 50%; box-shadow: 0 6px 24px rgba(0,0,0,0.25); background: #fff; }
 .auth-brand h1 { font-size: 24px; letter-spacing: 2px; color: #fff; text-shadow: 0 2px 12px rgba(0,0,0,0.55); }
-.auth-brand .en { font-size: 11px; letter-spacing: 2px; color: rgba(255,255,255,0.95); margin-top: 6px; text-shadow: 0 1px 6px rgba(0,0,0,0.55); }
+.auth-brand .en { font-size: 13px; letter-spacing: 2px; color: rgba(255,255,255,0.95); margin-top: 6px; text-shadow: 0 1px 6px rgba(0,0,0,0.55); }
 .auth-brand .sys {
   display: inline-block; margin-top: 14px; padding: 5px 18px;
   border: 1px solid rgba(255,255,255,0.45); color: #fff; border-radius: 999px;
@@ -165,6 +165,8 @@ code { font-family: Consolas, "Courier New", monospace; background: var(--navy-p
   font-size: 13px; font-weight: bold; flex-shrink: 0;
   object-fit: cover; overflow: hidden;
 }
+/* 头像图片统一限尺寸（覆盖顶栏 chip、个人设置预览等所有场景，防止大图溢出） */
+.avatar > img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .user-chip .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .user-chip .uname { line-height: 1; font-weight: 500; }
 .user-chip .role-tag {

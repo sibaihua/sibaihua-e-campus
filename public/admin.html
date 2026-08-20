@@ -296,7 +296,7 @@ async function loadClients() {
       <td><code>${esc(c.clientId)}</code></td>
       <td><code>${esc(c.clientSecret)}</code></td>
       <td class="cell-uri">${c.redirectUri ? esc(c.redirectUri) : '<span class="muted">不限制</span>'}</td>
-      <td class="cell-logo">${c.logoUrl ? `<img src="${esc(c.logoUrl)}" alt="logo" class="client-logo" onerror="this.outerHTML='<span class=\\'muted\\'>—</span>'">` : '<span class="muted">—</span>'}</td>
+      <td class="cell-logo"><img src="${esc(c.logoUrl || LOGO_URL)}" alt="logo" class="client-logo" onerror="this.outerHTML='<span class=\\'muted\\'>—</span>'"></td>
       <td class="muted">${esc(c.createdAt.replace('T', ' ').slice(0, 19))}</td>
       <td>
         <div class="client-actions">

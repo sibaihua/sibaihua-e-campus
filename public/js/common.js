@@ -143,11 +143,9 @@ function esc(s) {
   }[c]));
 }
 
-/* 用户头像 HTML：有 avatarUrl 显示图片（加载失败回退首字母），否则首字母圆 */
+/* 用户头像 HTML：优先用户自定义头像，未设置则使用校徽（均加载失败时回退首字母圆） */
 function avatarHtml(u) {
   const initial = esc((u.username || 'A').slice(0, 1).toUpperCase());
-  if (u && u.avatarUrl) {
-    return `<span class="avatar"><img src="${esc(u.avatarUrl)}" alt="" onerror="this.outerHTML='<span class=\\'avatar\\'>${initial}</span>'"></span>`;
-  }
-  return `<span class="avatar">${initial}</span>`;
+  const src = u && u.avatarUrl ? esc(u.avatarUrl) : LOGO_URL;
+  return `<span class="avatar"><img src="${src}" alt="" onerror="this.outerHTML='<span class=\\'avatar\\'>${initial}</span>'"></span>`;
 }
