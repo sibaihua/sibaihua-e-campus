@@ -91,15 +91,10 @@ code { font-family: Consolas, "Courier New", monospace; background: var(--navy-p
 }
 .auth-wrap { width: 100%; max-width: 440px; margin: auto; padding: 44px 16px 36px; position: relative; z-index: 1; }
 .auth-brand { text-align: center; margin-bottom: 26px; color: #fff; }
-.auth-brand .sys {
-  display: inline-block; padding: 8px 24px;
-  border: 1px solid rgba(255,255,255,0.5); color: #fff; border-radius: 999px;
-  font-size: 16px; letter-spacing: 6px; background: rgba(255,255,255,0.1);
-  backdrop-filter: blur(6px); box-shadow: 0 4px 20px rgba(0,0,0,0.25);
-}
-.auth-brand .welcome {
-  margin-top: 14px; font-size: 13.5px; color: rgba(255,255,255,0.95);
-  letter-spacing: 1px; text-shadow: 0 1px 6px rgba(0,0,0,0.55);
+.auth-brand .subtitle {
+  font-size: 30px; letter-spacing: 10px; font-weight: 600; color: #fff;
+  text-shadow: 0 3px 18px rgba(0,0,0,0.5);
+  line-height: 1.4;
 }
 .auth-card { padding: 30px 32px 26px; }
 .auth-card h2 { font-size: 19px; text-align: center; margin-bottom: 20px; color: var(--navy-dark); }
@@ -349,6 +344,7 @@ pre.doc-code {
   .user-chip .uname { max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .user-chip .role-tag { padding: 1px 6px; font-size: 10px; }
   .btn-sm { padding: 6px 10px; font-size: 12px; }
+  .auth-brand .subtitle { font-size: 24px; letter-spacing: 6px; }
   .admin-tabs, .user-tabs { gap: 6px; }
   .admin-tabs .tab, .user-tabs .tab { padding: 8px 14px; font-size: 13.5px; }
 }
