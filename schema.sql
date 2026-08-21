@@ -35,11 +35,13 @@ CREATE TABLE IF NOT EXISTS oauth_tokens (
 CREATE INDEX IF NOT EXISTS idx_oauth_tokens_user ON oauth_tokens(user_id);
 
 CREATE TABLE IF NOT EXISTS oauth_codes (
-  code         TEXT PRIMARY KEY,
-  user_id      INTEGER NOT NULL,
-  client_id    TEXT NOT NULL,
-  redirect_uri TEXT NOT NULL,
-  expires_at   INTEGER NOT NULL
+  code                  TEXT PRIMARY KEY,
+  user_id               INTEGER NOT NULL,
+  client_id             TEXT NOT NULL,
+  redirect_uri          TEXT NOT NULL,
+  code_challenge        TEXT NOT NULL DEFAULT '',
+  code_challenge_method TEXT NOT NULL DEFAULT '',
+  expires_at            INTEGER NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS oauth_clients (

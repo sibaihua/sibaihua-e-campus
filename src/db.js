@@ -114,13 +114,20 @@ const db = {
     await env.DB.prepare('DELETE FROM oauth_tokens WHERE user_id = ?').bind(userId).run();
   },
   async createOauthCode(env, code, rec) {
-    await env.DB.prepare('INSERT INTO oauth_codes (code, user_id, client_id, redirect_uri, expires_at) VALUES (?, ?, ?, ?, ?)')
-      .bind(code, rec.userId, rec.clientId, rec.redirectUri, rec.expiresAt).run();
+    await env.DB.prepare('INSERT INTO oauth_codes (code, user_id, client_id, redirect_uri, code_challenge, code_challenge_method, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .bind(code, rec.userId, rec.clientId, rec.redirectUri, rec.codeChallenge || '', rec.codeChallengeMethod || '', rec.expiresAt).run();
   },
   async getOauthCode(env, code) {
     const r = await env.DB.prepare('SELECT * FROM oauth_codes WHERE code = ?').bind(code).first();
     if (!r) return null;
-    return { userId: r.user_id, clientId: r.client_id, redirectUri: r.redirect_uri, expiresAt: r.expires_at };
+    return {
+      userId: r.user_id,
+      clientId: r.client_id,
+      redirectUri: r.redirect_uri,
+      codeChallenge: r.code_challenge || '',
+      codeChallengeMethod: r.code_challenge_method || '',
+      expiresAt: r.expires_at,
+    };
   },
   async deleteOauthCode(env, code) {
     await env.DB.prepare('DELETE FROM oauth_codes WHERE code = ?').bind(code).run();

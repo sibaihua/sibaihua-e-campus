@@ -12,7 +12,7 @@
 | 人机验证 | Cloudflare Turnstile | 管理后台开关 + 环境变量密钥 |
 | 静态前端 | Worker 内置静态资源（`public/`） | 随代码自动托管 |
 | gayg.de 邮箱开通 | fetch 调用开放 API | 管理后台填写管理员邮箱/密码 |
-| OAuth 2.0 | 密码模式 + 授权码模式 + userinfo | 内置（Worker 上完全可用） |
+| OAuth 2.0 | 密码模式 + 授权码模式 + PKCE + userinfo | 内置（Worker 上完全可用） |
 
 API 路径与响应结构与原 Node 版完全一致，前端无需改动。
 
@@ -128,7 +128,7 @@ npm run dev                        # http://localhost:8787/
 
 ## 常见问题
 
-- **OAuth 在 Worker 上能用吗？** 完全可用。OAuth 2.0（密码模式 / 授权码模式 / userinfo）是纯 HTTP 接口，不依赖文件系统与 SMTP，已在本项目本地环境完整验证：授权页预检 → 用户授权签发 code → code 换 access_token（一次性）→ userinfo。其他校园系统按「API 接口文档」接入即可；唯一注意回调地址 `redirect_uri` 需为 https（Worker 强制 HTTPS）。
+- **OAuth 在 Worker 上能用吗？** 完全可用。OAuth 2.0（密码模式 / 授权码模式 + PKCE / userinfo）是纯 HTTP 接口，不依赖文件系统与 SMTP。可信任的第一方服务端系统可使用 password 模式并在服务端保存 `client_secret`；包含浏览器前端的 Web 应用必须使用授权码模式 + PKCE，前端不得保存或暴露 `client_secret`。其他校园系统按「API 接口文档」接入即可；唯一注意回调地址 `redirect_uri` 需为 https（Worker 强制 HTTPS）。
 - **部署后绑定/普通变量被清空？** Git 集成（Workers Builds）每次构建会用 `wrangler.toml` 重置绑定和普通变量——D1 绑定与默认变量已内置在配置里；敏感值请以 **Secret** 类型添加（构建不会清除 Secret）。
 - **注册提示「数据库未就绪」**：确认控制台 D1 里数据库名是否为 `sibaihua-e-campus`（与 wrangler.toml 的 `database_name` 一致），不一致会绑定失败。
 - **注册提示「人机验证未通过」**：`TURNSTILE_SECRET` 未配置或与站点密钥不配套；管理后台可临时关闭 Turnstile 排查。
