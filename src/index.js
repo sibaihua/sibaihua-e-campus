@@ -794,42 +794,64 @@ async function hOauthAuthorizeConfirm(ctx) {
   const { body, env, user } = ctx;
   const client = await db.oauthClientById(env, String(body.clientId || ''));
   const redirectUri = String(body.redirectUri || '');
+  const codeChallenge = String(body.codeChallenge || '').trim();
+  const codeChallengeMethod = String(body.codeChallengeMethod || '').trim();
   if (!client) throw new ApiError(400, '无效的 client_id');
   if (client.redirectUri && redirectUri !== client.redirectUri) {
     throw new ApiError(400, 'redirect_uri 与客户端登记的回调地址不一致');
   }
   if (!/^https?:\/\//i.test(redirectUri)) throw new ApiError(400, 'redirect_uri 必须是合法的 http(s) URL');
+  if (codeChallenge && !codeChallengeMethod) throw new ApiError(400, '使用 PKCE 时必须提交 code_challenge_method=S256');
+  if (codeChallengeMethod && codeChallengeMethod.toUpperCase() !== 'S256') throw new ApiError(400, 'code_challenge_method 仅支持 S256');
+  if (codeChallengeMethod && !codeChallenge) throw new ApiError(400, '使用 PKCE 时必须提交 code_challenge');
 
   const code = randomHex(16);
   await db.createOauthCode(env, code, {
     userId: user.id,
     clientId: client.clientId,
     redirectUri,
+    codeChallenge,
+    codeChallengeMethod: codeChallenge ? 'S256' : '',
     expiresAt: Date.now() + CONFIG.oauthCodeTtlMs,
   });
   const sep = redirectUri.includes('?') ? '&' : '?';
   return ok({ redirect: `${redirectUri}${sep}code=${code}&state=${encodeURIComponent(String(body.state || ''))}` });
 }
 
-function clientSecretOk(client, secret) {
-  if (!client || typeof secret !== 'string') return false;
-  const a = new TextEncoder().encode(client.clientSecret);
-  const b = new TextEncoder().encode(secret);
+function timingSafeEqual(aText, bText) {
+  const a = new TextEncoder().encode(String(aText || ''));
+  const b = new TextEncoder().encode(String(bText || ''));
   if (a.length !== b.length) return false;
   let diff = 0;
   for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
   return diff === 0;
 }
 
+function clientSecretOk(client, secret) {
+  return !!client && timingSafeEqual(client.clientSecret, secret);
+}
+
+function base64Url(bytes) {
+  let s = '';
+  for (const b of bytes) s += String.fromCharCode(b);
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+async function pkceChallenge(verifier) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  return base64Url(new Uint8Array(digest));
+}
+
 async function hOauthToken(ctx) {
   const { body, env } = ctx;
   const grant = String(body.grant_type || '');
   const client = await db.oauthClientById(env, String(body.client_id || ''));
-  if (!clientSecretOk(client, String(body.client_secret || ''))) {
-    throw new ApiError(401, 'client_id 或 client_secret 无效');
-  }
+  if (!client) throw new ApiError(401, 'client_id 无效');
 
   if (grant === 'password') {
+    if (!clientSecretOk(client, String(body.client_secret || ''))) {
+      throw new ApiError(401, 'client_id 或 client_secret 无效');
+    }
     const username = normalizeUsername(body.username);
     const user = await db.userByUsername(env, username);
     if (!user || !(await verifyPassword(String(body.password || ''), user.passwordHash))) {
@@ -850,6 +872,17 @@ async function hOauthToken(ctx) {
     if (!rec || rec.expiresAt < Date.now()) throw new ApiError(400, '授权码无效或已过期');
     if (rec.clientId !== client.clientId) throw new ApiError(400, '授权码与客户端不匹配');
     if (rec.redirectUri !== String(body.redirect_uri || '')) throw new ApiError(400, 'redirect_uri 与授权时不一致');
+
+    if (rec.codeChallenge) {
+      const verifier = String(body.code_verifier || '');
+      if (!verifier) throw new ApiError(400, 'PKCE 模式必须提交 code_verifier');
+      if ((rec.codeChallengeMethod || '').toUpperCase() !== 'S256') throw new ApiError(400, '不支持的 code_challenge_method');
+      const expected = await pkceChallenge(verifier);
+      if (!timingSafeEqual(expected, rec.codeChallenge)) throw new ApiError(401, 'code_verifier 校验失败');
+    } else if (!clientSecretOk(client, String(body.client_secret || ''))) {
+      throw new ApiError(401, '未使用 PKCE 的授权码模式必须提交有效 client_secret');
+    }
+
     await db.deleteOauthCode(env, code);
     const token = await createAccessToken(env, rec.userId, client.clientId);
     return ok({
@@ -892,32 +925,35 @@ async function apiDocs(ctx) {
     updatedAt: new Date().toISOString(),
     aiIntegrationNote: `本接口文档面向其他 AI 助手或智能体。如果你是代表某个校园系统（选课、图书馆、门户等）接入“我的E校园”的 AI，请按以下步骤操作：
 
-1. 由系统管理员在“我的E校园”管理后台「OAuth 客户端」页面创建一个客户端，获取 client_id 与 client_secret。
-2. 管理员可随后通过 PUT /api/admin/oauth-clients 修改该客户端的回调地址（redirect_uri）。
-3. 若你的系统可安全持有用户密码（如第一方系统），使用密码模式（grant_type=password）直接换取 access_token。
-4. 若你的系统是第三方 Web 应用，使用授权码模式：将浏览器重定向到 /oauth?response_type=code&...，用户确认授权后，浏览器会携带 code 跳回 redirect_uri；再用 code 换取 access_token。
+1. 由系统管理员在“我的E校园”管理后台「OAuth 客户端」页面创建客户端，获取 client_id 与 client_secret。
+2. 管理员可通过 PUT /api/admin/oauth-clients 修改该客户端的回调地址 redirect_uri。
+3. 如果接入方是可信任的第一方服务端系统，可以使用 password 模式，并在服务端保存 client_secret。
+4. 如果接入方包含浏览器前端，必须使用授权码模式 + PKCE：前端只使用 client_id；前端生成 code_verifier；前端根据 code_verifier 计算 code_challenge；授权请求携带 code_challenge 和 code_challenge_method=S256；换取 token 时提交 code_verifier；不得把 client_secret 写入浏览器前端代码。
 5. 使用 access_token 调用 /api/oauth/userinfo 获取用户身份。所有受保护接口均在 Authorization 请求头中携带 Bearer <token>。
-6. 注意：access_token 有效期 2 小时；授权码 5 分钟且一次性；本系统所有 JSON 响应均包含 code / message / data 字段，code 为 200 表示成功。`,
+6. 注意：access_token 有效期 2 小时；授权码 5 分钟且一次性；本系统所有 JSON 响应均包含 code / message / data 字段，code 为 200 表示成功。`, 
     groups: [
       {
         title: '一、OAuth 2.0 统一账号接入接口（供其他校园系统使用）',
         desc: '其他校园系统可通过标准 OAuth 2.0 流程接入本系统账号体系。AI 助手在集成时，应引导调用方先完成客户端创建与回调地址配置。',
         items: [
-          { method: 'POST', path: '/api/oauth/token', desc: '获取 Access Token。这是接入的核心端点。密码模式适合可信任的第一方系统；授权码模式适合需要通过浏览器交互的第三方 Web 应用。', params: [
-            { name: 'grant_type', type: 'string', required: '是', desc: '固定值：password 或 authorization_code' },
-            { name: 'client_id', type: 'string', required: '是', desc: '客户端 ID（由管理员在后台创建）' },
-            { name: 'client_secret', type: 'string', required: '是', desc: '客户端密钥' },
-            { name: 'username', type: 'string', required: 'password 模式必填', desc: '用户的「我的E校园」用户名；输入 zhangsan 或 zhangsan@gayg.de 效果相同' },
-            { name: 'password', type: 'string', required: 'password 模式必填', desc: '用户的「我的E校园」登录密码' },
-            { name: 'code', type: 'string', required: 'authorization_code 模式必填', desc: '授权码模式第 2 步换取的 code，5 分钟内有效且只能使用一次' },
-            { name: 'redirect_uri', type: 'string', required: 'authorization_code 模式必填', desc: '必须与授权请求时传入的 redirect_uri 完全一致' },
-          ], example: `curl -X POST ${base}/api/oauth/token \\\n  -H "Content-Type: application/json" \\\n  -d '{"grant_type":"password","client_id":"sib_xxx","client_secret":"xxx","username":"zhangsan","password":"用户密码"}'`, response: '{\n  "code": 200,\n  "message": "success",\n  "data": {\n    "access_token": "3f9c...（64位十六进制）",\n    "token_type": "Bearer",\n    "expires_in": 7200,\n    "scope": "userinfo"\n  }\n}' },
-          { method: 'GET', path: '/oauth?response_type=code&client_id=...&redirect_uri=...&state=...', desc: '授权码模式第 1 步：将用户浏览器重定向到此授权页。用户登录并确认授权后，浏览器会携带 code 与 state 参数跳回 redirect_uri。AI 助手应构造完整 URL 并要求调用方通过 302/Location 或前端路由跳转。', params: [
-            { name: 'response_type', type: 'string', required: '是', desc: '固定值：code' },
+          { method: 'POST', path: '/api/oauth/token', desc: '获取 Access Token。密码模式仅适合可信任的第一方服务端系统；浏览器前端应使用授权码模式 + PKCE。', params: [
+            { name: 'grant_type', type: 'string', required: '是', desc: 'password 或 authorization_code' },
             { name: 'client_id', type: 'string', required: '是', desc: '客户端 ID' },
-            { name: 'redirect_uri', type: 'string', required: '是', desc: '回调地址，必须已在后台登记；创建时可留空表示不限制，生产环境强烈建议登记' },
-            { name: 'state', type: 'string', required: '建议必填', desc: '随机串，用于防止 CSRF，授权完成时会原样回传' },
-          ], example: `Redirect: ${base}/oauth?response_type=code&client_id=sib_xxx&redirect_uri=${encodeURIComponent('https://portal.example.com/callback')}&state=xyz`, response: '用户确认授权后浏览器跳转到：\nhttps://portal.example.com/callback?code=8a1b...&state=xyz' },
+            { name: 'client_secret', type: 'string', required: 'password 模式必填；未使用 PKCE 的服务端授权码模式必填', desc: '客户端密钥，不得写入浏览器前端' },
+            { name: 'username', type: 'string', required: 'password 模式必填', desc: '用户名' },
+            { name: 'password', type: 'string', required: 'password 模式必填', desc: '用户密码' },
+            { name: 'code', type: 'string', required: 'authorization_code 模式必填', desc: '授权码' },
+            { name: 'redirect_uri', type: 'string', required: 'authorization_code 模式必填', desc: '必须与授权请求一致' },
+            { name: 'code_verifier', type: 'string', required: 'PKCE 模式必填', desc: '与 code_challenge 对应的 verifier' },
+          ], example: `PKCE 换 token 示例：\ncurl -X POST ${base}/api/oauth/token \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "grant_type": "authorization_code",\n    "client_id": "sib_xxx",\n    "code": "回调中收到的授权码",\n    "redirect_uri": "https://portal.example.com/callback",\n    "code_verifier": "前端保存的 PKCE verifier"\n  }'`, response: '{\n  "code": 200,\n  "message": "success",\n  "data": {\n    "access_token": "3f9c...（64位十六进制）",\n    "token_type": "Bearer",\n    "expires_in": 7200,\n    "scope": "userinfo"\n  }\n}' },
+          { method: 'GET', path: '/oauth?response_type=code&client_id=...&redirect_uri=...&state=...&code_challenge=...&code_challenge_method=S256', desc: '授权码模式第 1 步：将用户浏览器重定向到此授权页。浏览器前端使用授权码模式时，必须携带 PKCE 参数。用户登录并确认授权后，浏览器会携带 code 与 state 参数跳回 redirect_uri。', params: [
+            { name: 'response_type', type: 'string', required: '是', desc: '固定为 code' },
+            { name: 'client_id', type: 'string', required: '是', desc: '客户端 ID' },
+            { name: 'redirect_uri', type: 'string', required: '是', desc: '回调地址' },
+            { name: 'state', type: 'string', required: '建议必填', desc: '防 CSRF 随机串' },
+            { name: 'code_challenge', type: 'string', required: '浏览器前端必填', desc: '由 code_verifier 计算得到' },
+            { name: 'code_challenge_method', type: 'string', required: '浏览器前端必填', desc: '固定为 S256' },
+          ], example: `${base}/oauth\n  ?response_type=code\n  &client_id=sib_xxx\n  &redirect_uri=${encodeURIComponent('https://portal.example.com/callback')}\n  &state=xyz\n  &code_challenge=xxxxx\n  &code_challenge_method=S256`, response: '用户确认授权后浏览器跳转到：\nhttps://portal.example.com/callback?code=8a1b...&state=xyz' },
           { method: 'GET', path: '/api/oauth/userinfo', desc: '凭 Access Token 获取当前授权用户的基本信息。AI 助手在拿到 access_token 后应调用此接口完成登录态映射。', headers: 'Authorization: Bearer <access_token>', example: `curl ${base}/api/oauth/userinfo -H "Authorization: Bearer <access_token>"`, response: '{\n  "code": 200,\n  "message": "success",\n  "data": {\n    "id": 2,\n    "username": "zhangsan",\n    "email": "zhangsan@gayg.de",\n    "englishName": "San Zhang",\n    "contactEmail": "zhangsan@gmail.com",\n    "role": "user",\n    "status": "approved"\n  }\n}' },
           { method: 'GET', path: '/api/oauth/authorize/info', desc: '授权页预检接口。AI 助手可在引导用户跳转前先调用此接口，验证 client_id 与 redirect_uri 是否有效，并获取客户端名称用于展示。', params: [
             { name: 'client_id', type: 'string', required: '是', desc: '客户端 ID' },

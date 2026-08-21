@@ -37,6 +37,8 @@ const q = new URLSearchParams(location.search);
 const clientId = q.get('client_id') || '';
 const redirectUri = q.get('redirect_uri') || '';
 const state = q.get('state') || '';
+const codeChallenge = q.get('code_challenge') || '';
+const codeChallengeMethod = q.get('code_challenge_method') || '';
 const responseType = q.get('response_type') || '';
 const card = document.getElementById('oauthCard');
 
@@ -50,7 +52,13 @@ function deny() {
 }
 
 async function confirm() {
-  const r = await API.post('/api/oauth/authorize', { clientId, redirectUri, state });
+  const r = await API.post('/api/oauth/authorize', {
+    clientId,
+    redirectUri,
+    state,
+    codeChallenge,
+    codeChallengeMethod,
+  });
   if (r.code === 200 && r.data && r.data.redirect) {
     location.href = r.data.redirect;
   } else {

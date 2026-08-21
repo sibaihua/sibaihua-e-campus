@@ -77,7 +77,7 @@
   <section class="card admin-card" id="panel-clients" hidden>
     <div class="card-head">
       <h2>OAuth 客户端</h2>
-      <p class="muted">供其他校园系统（如选课系统、图书馆系统）接入本系统账号体系，实现统一登录（OAuth 2.0）。接入方法见「API 接口文档」。</p>
+      <p class="muted">供其他校园系统（如选课系统、图书馆系统）接入本系统账号体系，实现统一登录（OAuth 2.0）。含浏览器前端的 Web 应用必须使用授权码模式 + PKCE，client_secret 只能保存在服务端。接入方法见「API 接口文档」。</p>
     </div>
     <form id="clientForm" class="form-inline">
       <label class="field"><span class="field-label">客户端名称</span>
