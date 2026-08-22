@@ -2,17 +2,19 @@
 'use strict';
 
 const API = {
-  get token() { return localStorage.getItem('sib_token') || ''; },
-  set token(v) { v ? localStorage.setItem('sib_token', v) : localStorage.removeItem('sib_token'); },
+  /* 登录会话令牌由后端通过 HttpOnly Cookie（sib_session）管理，
+   * 前端 JavaScript 不读取、不存储 token，避免 XSS 窃取。 */
+  get token() { return ''; },
+  set token(v) { /* no-op：token 仅存在于 HttpOnly Cookie 中 */ },
 
   async request(method, url, body) {
     const headers = { 'Content-Type': 'application/json' };
-    if (this.token) headers['Authorization'] = 'Bearer ' + this.token;
     let res;
     try {
       res = await fetch(url, {
         method,
         headers,
+        credentials: 'include', // 携带 HttpOnly 会话 Cookie
         body: body === undefined ? undefined : JSON.stringify(body),
       });
     } catch (e) {
@@ -20,8 +22,12 @@ const API = {
     }
     const data = await res.json().catch(() => ({}));
     if (res.status === 401 && !/\/api\/auth\/(login|register)/.test(url)) {
-      this.token = '';
-      location.href = '/';
+      // 会话失效：OAuth 授权页跳登录并带回跳地址，其他页面跳登录页
+      if (location.pathname === '/oauth') {
+        location.href = '/?next=' + encodeURIComponent(location.href);
+      } else if (location.pathname !== '/') {
+        location.href = '/';
+      }
     }
     return data;
   },
@@ -125,7 +131,6 @@ function renderBrand(el) {
 
 async function logout() {
   await API.post('/api/auth/logout');
-  API.token = '';
   location.href = '/';
 }
 

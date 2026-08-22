@@ -98,8 +98,8 @@ tabReg.onclick = () => switchTab(false);
 const nextUrl = new URLSearchParams(location.search).get('next');
 
 function afterAuth(r) {
-  if (r.code === 200 && r.data && r.data.token) {
-    API.token = r.data.token;
+  // 登录/注册成功后会话已由后端通过 HttpOnly Cookie 建立，无需前端保存 token
+  if (r.code === 200 && r.data && r.data.user) {
     location.href = nextUrl || '/app';
     return true;
   }
@@ -157,9 +157,8 @@ regForm.onsubmit = async (e) => {
   }
 };
 
-// 已登录用户直接进入后台
+// 已登录用户直接进入后台（会话由 HttpOnly Cookie 携带）
 (async () => {
-  if (!API.token) return;
   const me = await API.get('/api/auth/me');
   if (me.code === 200) location.href = nextUrl || '/app';
 })();
