@@ -70,6 +70,9 @@ const CONFIG = {
   captchaTtlMs: 5 * 60 * 1000,
   emailCodeTtlMs: 10 * 60 * 1000,
   emailCodeCooldownMs: 60 * 1000,
+  libraryUrlDefault: 'https://102007.xyz',
+  libraryBasicUsernameDefault: 'sibaihua',
+  libraryBasicPasswordDefault: 'sibaihua',
 };
 
 const RESERVED_USERNAMES = new Set([
@@ -166,6 +169,27 @@ async function getMailSettings(env) {
   const password =
     (await db.getSetting(env, 'mail_admin_password')) || env.MAIL_ADMIN_PASSWORD || CONFIG.mailAdminPasswordDefault;
   return { email, password };
+}
+
+async function getLibrarySettings(env) {
+  return {
+    url: (await db.getSetting(env, 'library_url')) || env.LIBRARY_URL || CONFIG.libraryUrlDefault,
+    basicUsername: (await db.getSetting(env, 'library_basic_username')) || env.LIBRARY_BASIC_USERNAME || CONFIG.libraryBasicUsernameDefault,
+    basicPassword: (await db.getSetting(env, 'library_basic_password')) || env.LIBRARY_BASIC_PASSWORD || CONFIG.libraryBasicPasswordDefault,
+  };
+}
+
+function libraryAuthUrl(settings) {
+  const raw = String(settings.url || '').trim();
+  if (!raw) return '';
+  const url = new URL(raw);
+  const username = String(settings.basicUsername || '');
+  const password = String(settings.basicPassword || '');
+  if (username || password) {
+    url.username = username;
+    url.password = password;
+  }
+  return url.toString();
 }
 
 async function turnstileEnabled(env) {
@@ -354,6 +378,18 @@ async function hCaptcha(ctx) {
 
 async function hApplyStatus(ctx) {
   return ok({ user: publicUser(ctx.user) });
+}
+
+async function hLibraryLaunch(ctx) {
+  const settings = await getLibrarySettings(ctx.env);
+  let url;
+  try {
+    url = libraryAuthUrl(settings);
+  } catch {
+    throw new ApiError(500, '图书馆链接配置不正确，请联系管理员');
+  }
+  if (!/^https?:\/\//i.test(url)) throw new ApiError(500, '图书馆链接配置不正确，请联系管理员');
+  return ok({ url });
 }
 
 /* 免验证模式下的联系邮箱更新（个人设置直接保存） */
@@ -606,11 +642,17 @@ async function hAdminSettingsGet(ctx) {
   requireAdmin(ctx.user);
   const creds = await getMailSettings(ctx.env);
   const mail = await getMailProvider(ctx.env, db);
+  const library = await getLibrarySettings(ctx.env);
   return ok({
     mailApiBase: ctx.env.MAIL_API_BASE || CONFIG.mailApiBaseDefault,
     mailAdminEmail: creds.email,
     hasPassword: !!creds.password,
     mailDomain: await mailDomain(ctx.env),
+    library: {
+      url: library.url,
+      basicUsername: library.basicUsername,
+      hasBasicPassword: !!library.basicPassword,
+    },
     turnstileEnabled: await turnstileEnabled(ctx.env),
     turnstileSiteKey: ctx.env.TURNSTILE_SITE_KEY || CONFIG.turnstileSiteKeyDefault,
     emailVerifyMode: await emailVerifyMode(ctx.env),
@@ -640,6 +682,22 @@ async function hAdminSettingsSave(ctx) {
   if (body.emailVerifyMode !== undefined) {
     const m = String(body.emailVerifyMode);
     if (['auto', 'on', 'off'].includes(m)) await db.setSetting(env, 'email_verify_mode', m);
+  }
+  if (body.libraryUrl !== undefined) {
+    const libraryUrl = String(body.libraryUrl || '').trim();
+    if (!/^https?:\/\//i.test(libraryUrl)) throw new ApiError(400, '图书馆链接必须以 http(s):// 开头');
+    new URL(libraryUrl);
+    await db.setSetting(env, 'library_url', libraryUrl);
+  }
+  if (body.libraryBasicUsername !== undefined) {
+    const libraryBasicUsername = String(body.libraryBasicUsername || '').trim();
+    if (libraryBasicUsername.length > 100) throw new ApiError(400, '图书馆 Basic 用户名过长');
+    await db.setSetting(env, 'library_basic_username', libraryBasicUsername);
+  }
+  if (body.libraryBasicPassword !== undefined && String(body.libraryBasicPassword || '') !== '') {
+    const libraryBasicPassword = String(body.libraryBasicPassword || '');
+    if (libraryBasicPassword.length > 200) throw new ApiError(400, '图书馆 Basic 密码过长');
+    await db.setSetting(env, 'library_basic_password', libraryBasicPassword);
   }
   await db.setSetting(env, 'mail_token_json', '');
   let tokenCheck = { ok: true };
@@ -1095,6 +1153,10 @@ const routes = [
   ['POST', /^\/api\/apply$/, async (ctx) => {
     if (!ctx.user) throw new ApiError(401, '未登录或登录已过期');
     return hApply(ctx);
+  }],
+  ['GET', /^\/api\/library\/launch$/, async (ctx) => {
+    if (!ctx.user) throw new ApiError(401, '未登录或登录已过期');
+    return hLibraryLaunch(ctx);
   }],
   ['GET', /^\/api\/application\/status$/, async (ctx) => {
     if (!ctx.user) throw new ApiError(401, '未登录或登录已过期');

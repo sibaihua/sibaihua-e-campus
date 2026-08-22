@@ -217,8 +217,10 @@ code { font-family: Consolas, "Courier New", monospace; background: var(--navy-p
   display: flex; align-items: center; gap: 14px; padding: 18px 20px;
   border: 1px solid var(--border); border-radius: 12px; color: var(--text);
   transition: all .18s; background: #fbfcfd; text-align: left;
+  font: inherit; width: 100%; cursor: pointer;
 }
 .link-card:hover { border-color: var(--navy-mid); box-shadow: var(--shadow); transform: translateY(-2px); }
+.link-card-button { appearance: none; -webkit-appearance: none; }
 .link-card .link-icon {
   width: 44px; height: 44px; border-radius: 10px; background: var(--navy-pale);
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
@@ -228,8 +230,14 @@ code { font-family: Consolas, "Courier New", monospace; background: var(--navy-p
 .link-card .arrow { margin-left: auto; color: var(--navy-mid); font-size: 18px; }
 
 /* ---------- 管理后台 ---------- */
-.admin-tabs, .user-tabs { background: transparent; border: none; margin-bottom: 22px; gap: 8px; max-width: 1000px; }
-.admin-tabs .tab, .user-tabs .tab { flex: none; padding: 9px 22px; border: 1px solid var(--border); border-radius: 999px; background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(8px); margin-bottom: 0; }
+.admin-tabs, .user-tabs {
+  background: transparent; border: none; margin-bottom: 22px; gap: 8px; max-width: 1000px;
+  overflow-x: auto; overflow-y: hidden; flex-wrap: nowrap; padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch; scrollbar-width: thin;
+}
+.admin-tabs::-webkit-scrollbar, .user-tabs::-webkit-scrollbar { height: 4px; }
+.admin-tabs::-webkit-scrollbar-thumb, .user-tabs::-webkit-scrollbar-thumb { background: rgba(30,58,95,.28); border-radius: 999px; }
+.admin-tabs .tab, .user-tabs .tab { flex: 0 0 auto; padding: 9px 22px; border: 1px solid var(--border); border-radius: 999px; background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(8px); margin-bottom: 0; white-space: nowrap; }
 .admin-tabs .tab.active, .user-tabs .tab.active { background: var(--navy); color: #fff; border-color: var(--navy); }
 
 /* 联系邮箱验证行 */
@@ -345,6 +353,9 @@ pre.doc-code {
   .user-chip .role-tag { padding: 1px 6px; font-size: 10px; }
   .btn-sm { padding: 6px 10px; font-size: 12px; }
   .auth-brand .subtitle { font-size: 24px; letter-spacing: 6px; }
-  .admin-tabs, .user-tabs { gap: 6px; }
-  .admin-tabs .tab, .user-tabs .tab { padding: 8px 14px; font-size: 13.5px; }
+  .admin-tabs, .user-tabs {
+    gap: 6px; margin-left: -10px; margin-right: -10px; padding: 0 10px 6px;
+    scroll-snap-type: x proximity;
+  }
+  .admin-tabs .tab, .user-tabs .tab { padding: 8px 14px; font-size: 13.5px; scroll-snap-align: start; }
 }
