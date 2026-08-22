@@ -101,15 +101,11 @@
 
   <section class="card admin-card" id="panel-settings" hidden>
     <div class="card-head">
-      <h2>系统设置 · 邮箱服务管理员</h2>
-      <p class="muted">系统使用以下 Cloud Mail（<a href="https://gayg.de/" target="_blank" rel="noopener">gayg.de</a>）管理员邮箱与密码调用 <code>genToken</code> 接口生成令牌，用于自动开通校园邮箱。修改后系统会立即验证连通性。</p>
+      <h2>系统设置</h2>
+      <p class="muted">校园邮箱无需配置：由用户名推导为 <code>username@gayg.de</code>，Cloud Mail（gayg.de）平台通过「我的E校园」OAuth 登录即可使用，无需单独开通。以下仅管理人机验证、邮箱验证模式与图书馆入口。</p>
     </div>
     <form id="settingsForm">
       <div class="form-grid">
-        <label class="field"><span class="field-label">管理员邮箱 <em>*</em></span>
-          <input name="mailAdminEmail" type="email" required maxlength="100" placeholder="admin@gayg.de"></label>
-        <label class="field"><span class="field-label">邮箱密码（留空表示不修改）</span>
-          <input name="mailAdminPassword" type="password" maxlength="64" placeholder="留空保持当前密码不变" autocomplete="new-password"></label>
         <label class="field"><span class="field-label">Cloudflare Turnstile 人机验证</span>
           <select name="turnstileEnabled">
             <option value="1">开启（注册、提交入学申请需验证）</option>
@@ -261,7 +257,7 @@ async function loadUsers() {
       <td>${esc(u.englishName) || '<span class="muted">—</span>'}</td>
       <td>${esc(u.contactEmail) || '<span class="muted">—</span>'}</td>
       <td>${statusBadge(u)}</td>
-      <td>${u.emailAccount ? esc(u.emailAccount) : '<span class="muted">—</span>'}</td>
+      <td>${u.campusEmail ? esc(u.campusEmail) : (u.emailAccount ? esc(u.emailAccount) : '<span class="muted">—</span>')}</td>
       <td class="muted">${u.appliedAt ? esc(u.appliedAt.replace('T', ' ').slice(0, 19)) : '—'}</td>
       <td class="muted">${esc(u.createdAt.replace('T', ' ').slice(0, 19))}</td>
       <td>
@@ -378,8 +374,6 @@ async function loadSettings() {
   const r = await API.get('/api/admin/settings');
   if (r.code !== 200) return;
   const form = document.getElementById('settingsForm');
-  form.mailAdminEmail.value = r.data.mailAdminEmail;
-  form.mailAdminPassword.value = '';
   form.turnstileEnabled.value = r.data.turnstileEnabled ? '1' : '0';
   form.emailVerifyMode.value = r.data.emailVerifyMode || 'auto';
   const library = r.data.library || {};
@@ -387,8 +381,7 @@ async function loadSettings() {
   form.libraryBasicUsername.value = library.basicUsername || 'sibaihua';
   form.libraryBasicPassword.value = '';
   document.getElementById('settingsInfo').innerHTML =
-    `邮箱服务：<code>${esc(r.data.mailApiBase)}</code> · 校园邮箱域：<code>@${esc(r.data.mailDomain)}</code>` +
-    (r.data.hasPassword ? ' · 密码已设置' : ' · <strong style="color:var(--danger)">未设置密码</strong>') +
+    `校园邮箱域：<code>@${esc(r.data.campusEmailDomain || 'gayg.de')}</code>` +
     ` · Turnstile 人机验证：${r.data.turnstileEnabled ? '<strong style="color:var(--success)">已开启</strong>' : '<span style="color:var(--muted)">已关闭</span>'}` +
     ` · 邮箱验证：${r.data.emailVerifyEnabled ? '<strong style="color:var(--success)">启用中</strong>' : '<span style="color:var(--muted)">未启用</span>'}` +
     ` · 图书馆：<code>${esc(library.url || 'https://102007.xyz')}</code>${library.hasBasicPassword ? ' · Basic 密码已设置' : ' · <span style="color:var(--muted)">Basic 密码为空</span>'}`;
@@ -417,8 +410,6 @@ document.getElementById('settingsForm').onsubmit = async (e) => {
   btn.disabled = true; btn.textContent = '保存并验证中…';
   try {
     const r = await API.post('/api/admin/settings', {
-      mailAdminEmail: fd.get('mailAdminEmail'),
-      mailAdminPassword: fd.get('mailAdminPassword') || '',
       turnstileEnabled: fd.get('turnstileEnabled') === '1',
       emailVerifyMode: fd.get('emailVerifyMode') || 'auto',
       libraryUrl: fd.get('libraryUrl') || 'https://102007.xyz',
@@ -426,12 +417,7 @@ document.getElementById('settingsForm').onsubmit = async (e) => {
       libraryBasicPassword: fd.get('libraryBasicPassword') || '',
     });
     if (r.code === 200) {
-      const chk = r.data.tokenCheck;
-      if (chk && chk.ok) {
-        info.innerHTML = `<span style="color:var(--success)">✓ ${esc(r.message)}</span>`;
-      } else {
-        err.textContent = `${r.message}：${chk ? chk.error : '未知错误'}`;
-      }
+      info.innerHTML = `<span style="color:var(--success)">✓ ${esc(r.message)}</span>`;
       loadSettings();
     } else {
       err.textContent = r.message || '保存失败';
