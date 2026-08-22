@@ -11,7 +11,7 @@
 | 发信 + 邮箱验证 | **可选功能**（MailChannels API） | 管理后台开关 + 发件配置 |
 | 人机验证 | Cloudflare Turnstile | 管理后台开关 + 环境变量密钥 |
 | 静态前端 | Worker 内置静态资源（`public/`） | 随代码自动托管 |
-| gayg.de 邮箱开通 | fetch 调用开放 API | 管理后台填写管理员邮箱/密码 |
+| 校园邮箱 | 由用户名推导为 `username@gayg.de`，Cloud Mail（gayg.de）通过「我的E校园」OAuth 登录 | 无需开通/无需管理员账号 |
 | OAuth 2.0 | 密码模式 + 授权码模式 + PKCE + userinfo | 内置（Worker 上完全可用） |
 
 API 路径与响应结构与原 Node 版完全一致，前端无需改动。

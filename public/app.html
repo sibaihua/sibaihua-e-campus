@@ -33,7 +33,7 @@ const state = { user: null, captchaId: null, emailSent: false, pubCfg: null };
 const main = document.getElementById('main');
 
 /* 密码体系提示（首次开通邮箱时展示） */
-const PASSWORD_NOTE = '温馨提示：首次开通校园邮箱时，邮箱密码与「我的E校园」登录密码一致；此后两者为相互独立的用户体系，密码互不同步，请分别妥善保管。';
+const PASSWORD_NOTE = '温馨提示：校园邮箱（gayg.de）通过「我的E校园」OAuth 授权登录，无需单独设置密码；此处仅管理「我的E校园」登录密码。';
 
 const CHECK_SVG = `
 <svg class="success-icon" width="76" height="76" viewBox="0 0 76 76" aria-hidden="true">
@@ -161,9 +161,9 @@ function renderApproved() {
           你已被司白画大学清迈分校正式录取，校园账号已自动开通：</p>
         <div class="account-card">
           <div class="account-row"><span>校园邮箱</span>
-            <strong>${esc(u.emailAccount || u.username + '@gayg.de')}
+            <strong>${esc(u.campusEmail || u.emailAccount || (u.username + '@gayg.de'))}
               <button class="copy-btn" type="button" id="copyMail">复制</button></strong></div>
-          <div class="account-row"><span>邮箱密码</span><strong>首次开通时与本系统登录密码一致</strong></div>
+          <div class="account-row"><span>登录方式</span><strong>gayg.de 使用「我的E校园」OAuth 授权登录，无需单独密码</strong></div>
         </div>
       </div>
       <div class="alert alert-info">${PASSWORD_NOTE}</div>
@@ -192,7 +192,7 @@ function renderApplyForm() {
   const u = state.user;
   const emailVerifyOn = !!(state.pubCfg && state.pubCfg.emailVerifyEnabled);
   const failTip = u.status === 'failed' && u.applyError
-    ? `<div class="alert alert-danger">上次申请时校园邮箱开通失败：${esc(u.applyError)}<br>请核对信息后重新提交。</div>` : '';
+    ? `<div class="alert alert-danger">上次申请提交失败：${esc(u.applyError)}<br>请核对信息后重新提交。</div>` : '';
 
   const mail = u.contactEmail || '';
   const mailVerified = !!u.emailVerified && !!mail;
@@ -215,8 +215,8 @@ function renderApplyForm() {
     <section class="card main-card">
       <div class="card-head">
         <h2>入学申请</h2>
-        <p class="muted">填写英文姓名与个人联系邮箱提交申请。申请提交后<strong>自动审核通过</strong>，系统将立即为你开通校园邮箱
-          <strong>${esc(u.username)}@gayg.de</strong>。</p>
+        <p class="muted">填写英文姓名与个人联系邮箱提交申请。申请提交后<strong>自动审核通过</strong>。你的校园邮箱为
+          <strong>${esc(u.username)}@gayg.de</strong>，登录 gayg.de 时使用「我的E校园」账号通过 OAuth 授权即可，无需单独开通。</p>
       </div>
       ${failTip}
       <form id="applyForm">
@@ -324,7 +324,7 @@ function renderProfile() {
   return `
     <section class="card main-card">
       <div class="card-head"><h2>个人设置 · 登录密码</h2>
-        <p class="muted">仅修改「我的E校园」登录密码，校园邮箱密码不受影响（两者为独立用户体系）。</p></div>
+        <p class="muted">校园邮箱（gayg.de）通过「我的E校园」OAuth 登录，无需单独密码；此处仅修改「我的E校园」登录密码。</p></div>
       <form id="pwForm">
         <label class="field"><span class="field-label">原密码 <em>*</em></span>
           <input name="oldPassword" type="password" required maxlength="64" autocomplete="current-password"></label>
@@ -444,7 +444,7 @@ function renderAccount() {
     ['英文姓名', u.englishName || '—'],
     ['个人联系邮箱', u.contactEmail ? `${u.contactEmail} ${u.emailVerified ? '<span class="badge badge-approved">已验证</span>' : '<span class="badge badge-registered">未验证</span>'}` : '—'],
     ['账号状态', u.status === 'approved' ? '已录取' : (u.status === 'failed' ? '开户失败' : '待申请')],
-    ['校园邮箱', u.emailAccount || (u.role === 'admin' ? '管理员账号' : '—')],
+    ['校园邮箱', u.campusEmail || u.emailAccount || (u.role === 'admin' ? '管理员账号' : '—')],
     ['注册时间', u.createdAt.replace('T', ' ').slice(0, 19)],
     ['申请时间', u.appliedAt ? u.appliedAt.replace('T', ' ').slice(0, 19) : '—'],
   ];

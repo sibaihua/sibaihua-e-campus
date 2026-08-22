@@ -58,9 +58,6 @@ async function ensureReady(env) {
 
 const CONFIG = {
   appName: '司白画大学清迈分校“我的E校园”',
-  mailApiBaseDefault: 'https://gayg.de',
-  mailAdminEmailDefault: 'iam@gayg.de',
-  mailAdminPasswordDefault: '858308533',
   smtpFromNameDefault: '司白画大学清迈分校 · 我的E校园',
   turnstileSiteKeyDefault: '0x4AAAAAAEWvmxLZVjDXieV9',
   turnstileSecretDefault: '0x4AAAAAAEWvm_-KpS9SUypKfVV_S-tgsdM',
@@ -136,6 +133,7 @@ function publicUser(u) {
     emailVerified: !!u.emailVerified,
     status: u.status,
     emailAccount: u.emailAccount,
+    campusEmail: `${u.username}@gayg.de`,
     applyError: u.applyError,
     avatarUrl: u.avatarUrl || null,
     createdAt: u.createdAt,
@@ -158,17 +156,12 @@ async function readBody(request) {
 
 /* ============================== 设置 ============================== */
 
-async function mailDomain(env) {
-  const s = await getMailSettings(env);
-  const at = s.email.lastIndexOf('@');
-  return at > 0 ? s.email.slice(at + 1) : 'gayg.de';
-}
-
-async function getMailSettings(env) {
-  const email = (await db.getSetting(env, 'mail_admin_email')) || env.MAIL_ADMIN_EMAIL || CONFIG.mailAdminEmailDefault;
-  const password =
-    (await db.getSetting(env, 'mail_admin_password')) || env.MAIL_ADMIN_PASSWORD || CONFIG.mailAdminPasswordDefault;
-  return { email, password };
+/* 校园邮箱域名固定为 gayg.de；校园邮箱地址由「我的E校园」用户名推导为 username@gayg.de。
+   Cloud Mail（gayg.de）平台通过「我的E校园」OAuth 登录，因此不再需要 Cloud Mail 管理员账号，
+   也不再自动开通邮箱。 */
+const CAMPUS_EMAIL_DOMAIN = 'gayg.de';
+async function mailDomain() {
+  return CAMPUS_EMAIL_DOMAIN;
 }
 
 async function getLibrarySettings(env) {
@@ -240,50 +233,6 @@ async function verifyTurnstile(env, token, ip) {
   } catch {
     return false;
   }
-}
-
-/* ============================== Cloud Mail (gayg.de) API ============================== */
-
-async function mailApi(env, pathname, body, token) {
-  const base = (env.MAIL_API_BASE || CONFIG.mailApiBaseDefault).replace(/\/+$/, '');
-  const headers = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = token;
-  const res = await fetch(base + pathname, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-  });
-  const text = await res.text();
-  try { return JSON.parse(text); } catch { throw new Error(`邮箱服务返回了非 JSON 内容（HTTP ${res.status}）`); }
-}
-
-async function getMailToken(env, force) {
-  const cached = await db.getSetting(env, 'mail_token_json');
-  if (!force && cached) {
-    try {
-      const c = JSON.parse(cached);
-      if (c.token && Date.now() - c.generatedAt < 6 * 3600 * 1000) return c.token;
-    } catch { /* ignore */ }
-  }
-  const creds = await getMailSettings(env);
-  const r = await mailApi(env, '/api/public/genToken', { email: creds.email, password: creds.password });
-  if (r.code !== 200 || !r.data || !r.data.token) {
-    throw new Error(r.message || '生成邮箱 API 令牌失败');
-  }
-  await db.setSetting(env, 'mail_token_json', JSON.stringify({ token: r.data.token, generatedAt: Date.now() }));
-  return r.data.token;
-}
-
-async function createMailAccount(env, email, password) {
-  const payload = { list: [{ email, password }] };
-  let token = await getMailToken(env, false);
-  let r = await mailApi(env, '/api/public/addUser', payload, token);
-  if (r.code === 401) {
-    token = await getMailToken(env, true);
-    r = await mailApi(env, '/api/public/addUser', payload, token);
-  }
-  if (r.code !== 200) throw new Error(r.message || `邮箱服务返回错误码 ${r.code}`);
-  return r;
 }
 
 /* ============================== 会话 ============================== */
@@ -523,28 +472,15 @@ async function hApply(ctx) {
   }
 
   const emailAccount = `${user.username}@${await mailDomain(env)}`;
-  try {
-    await createMailAccount(env, emailAccount, await decryptPassword(env, user.passwordEnc));
-    const updated = await db.updateUser(env, user.id, {
-      englishName,
-      contactEmail,
-      status: 'approved',
-      emailAccount,
-      applyError: null,
-      appliedAt: new Date().toISOString(),
-    });
-    return ok({ user: publicUser(updated) }, '入学申请已通过');
-  } catch (e) {
-    const updated = await db.updateUser(env, user.id, {
-      englishName,
-      contactEmail,
-      status: 'failed',
-      applyError: e.message,
-      emailAccount: null,
-      appliedAt: new Date().toISOString(),
-    });
-    throw new ApiError(502, `入学申请已提交，但校园邮箱开通失败：${e.message}`, { user: publicUser(updated) });
-  }
+  const updated = await db.updateUser(env, user.id, {
+    englishName,
+    contactEmail,
+    status: 'approved',
+    emailAccount,
+    applyError: null,
+    appliedAt: new Date().toISOString(),
+  });
+  return ok({ user: publicUser(updated) }, '入学申请已通过');
 }
 
 /* ============================== 管理后台 ============================== */
@@ -610,7 +546,7 @@ async function hAdminUsersUpdate(ctx) {
       if (await db.userByUsername(env, username)) throw new ApiError(409, '该用户名已被占用');
       fields.username = username;
       if (target.emailAccount && target.emailAccount.includes('@')) {
-        fields.emailAccount = `${username}@${target.emailAccount.split('@')[1]}`;
+        fields.emailAccount = `${username}@${CAMPUS_EMAIL_DOMAIN}`;
       }
     }
   }
@@ -639,7 +575,7 @@ async function hAdminUsersUpdate(ctx) {
     if (!['registered', 'approved', 'failed'].includes(st)) throw new ApiError(400, '无效的状态');
     fields.status = st;
     if (st === 'approved' && !target.emailAccount) {
-      fields.emailAccount = `${target.username}@${await mailDomain(env)}`;
+      fields.emailAccount = `${target.username}@${CAMPUS_EMAIL_DOMAIN}`;
     }
   }
   if (body.emailAccount !== undefined) {
@@ -671,14 +607,10 @@ async function hAdminUsersDelete(ctx) {
 
 async function hAdminSettingsGet(ctx) {
   requireAdmin(ctx.user);
-  const creds = await getMailSettings(ctx.env);
   const mail = await getMailProvider(ctx.env, db);
   const library = await getLibrarySettings(ctx.env);
   return ok({
-    mailApiBase: ctx.env.MAIL_API_BASE || CONFIG.mailApiBaseDefault,
-    mailAdminEmail: creds.email,
-    hasPassword: !!creds.password,
-    mailDomain: await mailDomain(ctx.env),
+    campusEmailDomain: CAMPUS_EMAIL_DOMAIN,
     library: {
       url: library.url,
       basicUsername: library.basicUsername,
@@ -701,11 +633,6 @@ async function hAdminSettingsGet(ctx) {
 async function hAdminSettingsSave(ctx) {
   requireAdmin(ctx.user);
   const { body, env } = ctx;
-  const email = String(body.mailAdminEmail || '').trim();
-  const password = String(body.mailAdminPassword || '');
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new ApiError(400, '管理员邮箱格式不正确');
-  await db.setSetting(env, 'mail_admin_email', email);
-  if (password) await db.setSetting(env, 'mail_admin_password', password);
   if (body.turnstileEnabled !== undefined) {
     const on = body.turnstileEnabled === true || body.turnstileEnabled === 'true' || body.turnstileEnabled === 1 || body.turnstileEnabled === '1';
     await db.setSetting(env, 'turnstile_enabled', on ? '1' : '0');
@@ -730,16 +657,11 @@ async function hAdminSettingsSave(ctx) {
     if (libraryBasicPassword.length > 200) throw new ApiError(400, '图书馆 Basic 密码过长');
     await db.setSetting(env, 'library_basic_password', libraryBasicPassword);
   }
-  await db.setSetting(env, 'mail_token_json', '');
-  let tokenCheck = { ok: true };
-  try { await getMailToken(env, true); } catch (e) { tokenCheck = { ok: false, error: e.message }; }
   return ok({
-    mailAdminEmail: email,
-    mailDomain: await mailDomain(env),
+    campusEmailDomain: CAMPUS_EMAIL_DOMAIN,
     turnstileEnabled: await turnstileEnabled(env),
     emailVerifyMode: await emailVerifyMode(env),
-    tokenCheck,
-  }, tokenCheck.ok ? '设置已保存，邮箱服务连接正常' : '设置已保存，但生成 Token 失败，请检查邮箱与密码');
+  }, '设置已保存');
 }
 
 async function hPublicConfig(ctx) {
@@ -994,7 +916,7 @@ async function hOauthUserinfo(ctx) {
   return ok({
     id: user.id,
     username: user.username,
-    email: user.emailAccount,
+    email: `${user.username}@${CAMPUS_EMAIL_DOMAIN}`,
     englishName: user.englishName,
     contactEmail: user.contactEmail,
     role: user.role,
@@ -1054,10 +976,10 @@ async function apiDocs(ctx) {
         title: '二、“我的E校园”内部接口',
         desc: '本系统前端的注册、登录、验证码与入学申请均基于以下接口。AI 助手若需替用户完成批量或自动化操作，可直接调用；注意入学申请接口需要图形验证码。',
         items: [
-          { method: 'POST', path: '/api/auth/register', desc: '注册“我的E校园”账号。注册成功后默认状态为 registered，需继续完成个人联系邮箱验证并调用 /api/apply 提交入学申请，系统才会自动开通校园邮箱。若管理后台开启 Turnstile 人机验证，则需附带 cfTurnstileToken。', params: [
+          { method: 'POST', path: '/api/auth/register', desc: '注册“我的E校园”账号。注册成功后默认状态为 registered，可继续完成个人联系邮箱验证并调用 /api/apply 提交入学申请。入学审核通过后，校园邮箱地址随用户名推导为 <用户名>@gayg.de；Cloud Mail（gayg.de）平台使用「我的E校园」OAuth 登录，无需单独开通邮箱。若管理后台开启 Turnstile 人机验证，则需附带 cfTurnstileToken。', params: [
             { name: 'cfTurnstileToken', type: 'string', required: '开关开启时', desc: 'Cloudflare Turnstile 前端小部件返回的 token（管理后台「系统设置」可开关）' },
-            { name: 'username', type: 'string', required: '是', desc: '至少 3 位（最长 30 位），仅限字母/数字，可含 . _ -，不能为纯数字，建议使用英文姓名或其简拼；将成为校园邮箱前缀' },
-            { name: 'password', type: 'string', required: '是', desc: '6-64 位；首次开通邮箱时与校园邮箱密码一致' },
+            { name: 'username', type: 'string', required: '是', desc: '至少 3 位（最长 30 位），仅限字母/数字，可含 . _ -，不能为纯数字，建议使用英文姓名或其简拼；即校园邮箱 username@gayg.de 的前缀' },
+            { name: 'password', type: 'string', required: '是', desc: '6-64 位；用于「我的E校园」登录（校园邮箱 gayg.de 通过 OAuth 登录，无需单独密码）' },
           ], response: '{ "code": 200, "data": { "token": "会话令牌", "user": { "id": 3, "username": "zhangsan", "status": "registered", ... } } }' },
           { method: 'POST', path: '/api/auth/login', desc: '登录并获取会话令牌。用户名可输入 "zhangsan" 或 "zhangsan@gayg.de"，效果相同。登录不需要人机验证。', params: [
             { name: 'username', type: 'string', required: '是', desc: '用户名（自动忽略 @gayg.de 后缀）' },
@@ -1071,19 +993,19 @@ async function apiDocs(ctx) {
             { name: 'email', type: 'string', required: '是', desc: '与发送验证码时一致的邮箱' },
             { name: 'code', type: 'string', required: '是', desc: '邮件中收到的 6 位验证码' },
           ], response: '{ "code": 200, "message": "邮箱验证成功", "data": { "user": { "emailVerified": true, ... } } }' },
-          { method: 'POST', path: '/api/auth/change-password', desc: '修改“我的E校园”登录密码。注意：密码体系与校园邮箱相互独立，修改后校园邮箱密码不受影响。', headers: 'Authorization: Bearer <会话令牌>', params: [
+          { method: 'POST', path: '/api/auth/change-password', desc: '修改“我的E校园”登录密码。校园邮箱（gayg.de）通过「我的E校园」OAuth 登录，无需单独密码，因此此处仅影响「我的E校园」登录。', headers: 'Authorization: Bearer <会话令牌>', params: [
             { name: 'oldPassword', type: 'string', required: '是', desc: '原登录密码' },
             { name: 'newPassword', type: 'string', required: '是', desc: '新密码 6-64 位' },
           ], response: '{ "code": 200, "message": "密码已修改（仅同步“我的E校园”登录密码，校园邮箱密码不受影响）" }' },
           { method: 'GET', path: '/api/captcha', desc: '获取图形验证码。返回 SVG 图形与 captchaId，5 分钟有效、一次性使用。调用 /api/apply 前必须先获取并让用户识别验证码。', response: '{ "code": 200, "data": { "captchaId": "uuid", "image": "<svg ...>" } }' },
-          { method: 'POST', path: '/api/apply', desc: '提交入学申请。前置条件：个人联系邮箱已通过 /api/verify-email/* 完成验证（emailVerified=true）。验证码校验通过后自动录取，并调用 gayg.de 开放 API 自动开通校园邮箱（前缀=用户名，密码与注册时一致）。', headers: 'Authorization: Bearer <会话令牌>', params: [
+          { method: 'POST', path: '/api/apply', desc: '提交入学申请。前置条件：个人联系邮箱已通过 /api/verify-email/* 完成验证（emailVerified=true）。验证码校验通过后自动录取。校园邮箱地址随用户名推导为 <用户名>@gayg.de，gayg.de 通过「我的E校园」OAuth 登录，系统不再自动开通邮箱。', headers: 'Authorization: Bearer <会话令牌>', params: [
             { name: 'cfTurnstileToken', type: 'string', required: '开关开启时', desc: 'Cloudflare Turnstile token（管理后台「系统设置」可开关）' },
             { name: 'englishName', type: 'string', required: '是', desc: '英文姓名，2-60 位英文字母（可含空格、连字符、单引号、点）' },
             { name: 'contactEmail', type: 'string', required: '是', desc: '个人联系邮箱（任意域名均可），必须与已验证的邮箱完全一致' },
             { name: 'captchaId', type: 'string', required: '是', desc: '图形验证码 ID' },
             { name: 'captchaCode', type: 'string', required: '是', desc: '图形验证码字符（不区分大小写）' },
-          ], response: '{ "code": 200, "message": "入学申请已通过", "data": { "user": { "status": "approved", "emailAccount": "zhangsan@gayg.de", ... } } }' },
-          { method: 'GET', path: '/api/application/status', desc: '查询当前用户入学申请状态。', headers: 'Authorization: Bearer <会话令牌>', response: '{ "code": 200, "data": { "user": { "status": "approved", "emailAccount": "...", ... } } }' },
+          ], response: '{ "code": 200, "message": "入学申请已通过", "data": { "user": { "status": "approved", "campusEmail": "zhangsan@gayg.de", ... } } }' },
+          { method: 'GET', path: '/api/application/status', desc: '查询当前用户入学申请状态。', headers: 'Authorization: Bearer <会话令牌>', response: '{ "code": 200, "data": { "user": { "status": "approved", "campusEmail": "zhangsan@gayg.de", ... } } }' },
           { method: 'GET', path: '/api/health', desc: '健康检查。', response: '{ "code": 200, "data": { "app": "司白画大学清迈分校“我的E校园”", "time": "..." } }' },
         ],
       },
@@ -1099,7 +1021,7 @@ async function apiDocs(ctx) {
             { name: 'englishName', type: 'string', required: '否', desc: '英文姓名' },
             { name: 'contactEmail', type: 'string', required: '否', desc: '联系邮箱' },
           ], response: '{ "code": 200, "message": "用户已创建", "data": { "user": { ... } } }' },
-          { method: 'PUT', path: '/api/admin/users', desc: '编辑用户。所有字段均可选，只传需要修改的。修改用户名会同步更新系统中记录的校园邮箱前缀（仅系统记录，gayg.de 上的真实邮箱地址不会改变）；修改密码只更新「我的E校园」登录密码（哈希与密文），gayg.de 校园邮箱的真实密码不受影响——两者为相互独立的用户体系。', headers: 'Authorization: Bearer <管理员会话令牌>', params: [
+          { method: 'PUT', path: '/api/admin/users', desc: '编辑用户。所有字段均可选，只传需要修改的。校园邮箱由用户名推导为 <用户名>@gayg.de（gayg.de 通过「我的E校园」OAuth 登录，无需单独开通，故修改用户名会同步更新该推导值）；修改密码只更新「我的E校园」登录密码（哈希与密文），不影响 gayg.de 的 OAuth 登录。', headers: 'Authorization: Bearer <管理员会话令牌>', params: [
             { name: 'id', type: 'integer', required: '是', desc: '用户 ID' },
             { name: 'username', type: 'string', required: '否', desc: '新用户名（不能与现有用户重复）' },
             { name: 'password', type: 'string', required: '否', desc: '新密码（6-64 位，不传或空则不修改）' },
@@ -1112,12 +1034,14 @@ async function apiDocs(ctx) {
           { method: 'DELETE', path: '/api/admin/users', desc: '删除用户，并清理其所有登录会话与 OAuth 令牌。不能删除自己的账号。', headers: 'Authorization: Bearer <管理员会话令牌>', params: [
             { name: 'id', type: 'integer', required: '是', desc: '用户 ID' },
           ], response: '{ "code": 200, "message": "用户已删除", "data": null }' },
-          { method: 'GET', path: '/api/admin/settings', desc: '获取系统设置：Cloud Mail 管理员邮箱（密码不返回，仅返回是否已设置）、Turnstile 人机验证开关、邮件服务配置（API Key 不返回明文）。', headers: 'Authorization: Bearer <管理员会话令牌>', response: '{ "code": 200, "data": { "mailApiBase": "https://gayg.de", "mailAdminEmail": "iam@gayg.de", "hasPassword": true, "mailDomain": "gayg.de", "turnstileEnabled": true, "turnstileSiteKey": "0x4A...", "mail": { "provider": "mailchannels", "from": "...", "hasApiKey": true } } }' },
-          { method: 'POST', path: '/api/admin/settings', desc: '设置用于生成 gayg.de API Token 的 Cloud Mail 管理员邮箱与密码，并可开关 Cloudflare Turnstile 人机验证（影响注册与提交入学申请，登录不受影响）。保存后系统会立即尝试生成 Token 验证连通性。密码留空表示不修改。', headers: 'Authorization: Bearer <管理员会话令牌>', params: [
-            { name: 'mailAdminEmail', type: 'string', required: '是', desc: 'Cloud Mail 管理员邮箱' },
-            { name: 'mailAdminPassword', type: 'string', required: '否', desc: '密码（留空 = 保持原有密码不变）' },
+          { method: 'GET', path: '/api/admin/settings', desc: '获取系统设置：Turnstile 人机验证开关、校园邮箱域名、图书馆入口、邮件服务配置（API Key 不返回明文）。', headers: 'Authorization: Bearer <管理员会话令牌>', response: '{ "code": 200, "data": { "campusEmailDomain": "gayg.de", "turnstileEnabled": true, "turnstileSiteKey": "0x4A...", "mail": { "provider": "mailchannels", "from": "...", "hasApiKey": true } } }' },
+          { method: 'POST', path: '/api/admin/settings', desc: '保存系统设置：Cloudflare Turnstile 人机验证开关、邮箱验证模式、图书馆入口（含 Basic 认证用户名/密码）。校园邮箱无需配置（由用户名推导为 username@gayg.de，gayg.de 通过「我的E校园」OAuth 登录）。', headers: 'Authorization: Bearer <管理员会话令牌>', params: [
             { name: 'turnstileEnabled', type: 'boolean', required: '否', desc: 'true=开启人机验证（默认），false=关闭；留空表示不修改' },
-          ], response: '{ "code": 200, "data": { "tokenCheck": { "ok": true }, "turnstileEnabled": true } }' },
+            { name: 'emailVerifyMode', type: 'string', required: '否', desc: 'auto / on / off；留空表示不修改' },
+            { name: 'libraryUrl', type: 'string', required: '否', desc: '校园图书馆入口链接（http(s)）' },
+            { name: 'libraryBasicUsername', type: 'string', required: '否', desc: '图书馆 Basic 认证用户名' },
+            { name: 'libraryBasicPassword', type: 'string', required: '否', desc: '图书馆 Basic 认证密码（留空 = 不修改）' },
+          ], response: '{ "code": 200, "data": { "campusEmailDomain": "gayg.de", "turnstileEnabled": true } }' },
           { method: 'POST', path: '/api/admin/settings/mail', desc: '保存邮件服务配置（MailChannels 通道，用于个人联系邮箱验证发信）。API Key 留空表示不修改。', headers: 'Authorization: Bearer <管理员会话令牌>', params: [
             { name: 'provider', type: 'string', required: '否', desc: '固定值：mailchannels（默认）' },
             { name: 'from', type: 'string', required: '是', desc: '发件邮箱地址（需在 MailChannels 验证过的域名下）' },
