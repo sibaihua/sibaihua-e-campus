@@ -288,6 +288,26 @@ async function createMailAccount(env, email, password) {
 
 /* ============================== 会话 ============================== */
 
+const SESSION_COOKIE = 'sib_session';
+
+/* 从 Cookie 中读取会话令牌（前端会话使用 HttpOnly Cookie，JS 无法读取） */
+function cookieToken(request) {
+  const h = request.headers.get('cookie') || '';
+  const m = new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]+)`).exec(h);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+/* 设置会话 Cookie：HttpOnly + Secure + SameSite=Lax，7 天有效期（与 sessionTtlMs 一致） */
+function sessionCookieHeader(token) {
+  const maxAge = Math.floor(CONFIG.sessionTtlMs / 1000);
+  return `${SESSION_COOKIE}=${encodeURIComponent(token)}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${maxAge}`;
+}
+
+/* 清除会话 Cookie */
+function clearSessionCookieHeader() {
+  return `${SESSION_COOKIE}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0`;
+}
+
 async function createSession(env, userId) {
   const token = randomHex(32);
   await db.createSession(env, token, userId, Date.now() + CONFIG.sessionTtlMs);
@@ -295,7 +315,8 @@ async function createSession(env, userId) {
 }
 
 async function getSessionUser(env, request) {
-  const token = bearerToken(request);
+  // 优先 Authorization: Bearer（服务端接入方/API 客户端），其次 HttpOnly Cookie（浏览器前端会话）
+  const token = bearerToken(request) || cookieToken(request);
   if (!token) return null;
   const s = await db.getSession(env, token);
   if (!s) return null;
@@ -333,7 +354,12 @@ async function hRegister(ctx) {
     createdAt: new Date().toISOString(),
   });
   const token = await createSession(env, user.id);
-  return ok({ token, user: publicUser(user) }, '注册成功');
+  return {
+    status: 200,
+    data: { token, user: publicUser(user) },
+    message: '注册成功',
+    headers: { 'Set-Cookie': sessionCookieHeader(token) },
+  };
 }
 
 async function hLogin(ctx) {
@@ -344,7 +370,12 @@ async function hLogin(ctx) {
     throw new ApiError(401, '用户名或密码错误');
   }
   const token = await createSession(env, user.id);
-  return ok({ token, user: publicUser(user) }, '登录成功');
+  return {
+    status: 200,
+    data: { token, user: publicUser(user) },
+    message: '登录成功',
+    headers: { 'Set-Cookie': sessionCookieHeader(token) },
+  };
 }
 
 async function hMe(ctx) {
@@ -1128,9 +1159,9 @@ const routes = [
   ['POST', /^\/api\/auth\/register$/, hRegister],
   ['POST', /^\/api\/auth\/login$/, hLogin],
   ['POST', /^\/api\/auth\/logout$/, async (ctx) => {
-    const token = bearerToken(ctx.request);
+    const token = bearerToken(ctx.request) || cookieToken(ctx.request);
     if (token) await db.deleteSession(ctx.env, token);
-    return ok(null, '已退出登录');
+    return { status: 200, data: null, message: '已退出登录', headers: { 'Set-Cookie': clearSessionCookieHeader() } };
   }],
   ['GET', /^\/api\/auth\/me$/, async (ctx) => {
     if (!ctx.user) throw new ApiError(401, '未登录或登录已过期');
@@ -1256,7 +1287,7 @@ export default {
         for (const [method, re, handler] of routes) {
           if (request.method === method && re.test(url.pathname)) {
             const r = await handler(ctx);
-            return json(r.status || 200, { code: r.status || 200, message: r.message || 'success', data: r.data === undefined ? null : r.data });
+            return json(r.status || 200, { code: r.status || 200, message: r.message || 'success', data: r.data === undefined ? null : r.data }, r.headers);
           }
         }
         return json(404, { code: 404, message: `接口不存在: ${request.method} ${url.pathname}`, data: null });
