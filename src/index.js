@@ -111,7 +111,9 @@ function json(status, obj, extraHeaders) {
 function ok(data, message) { return { status: 200, data, message: message || 'success' }; }
 
 function normalizeUsername(raw) {
-  return String(raw || '').trim().toLowerCase().replace(/@gayg\.de$/, '');
+  return String(raw || '').trim().toLowerCase()
+    .replace(/@stu\.sibaihua\.com$/, '')
+    .replace(/@gayg\.de$/, '');
 }
 
 function usernameRuleError(username) {
