@@ -21,7 +21,7 @@ import { makeDbInit } from './schema.js';
 const ensureDb = makeDbInit();
 
 /* 首次使用预置管理员（幂等）：新部署无需任何配置即可登录管理后台
- * 用户名 iam（也可用 iam@gayg.de 登录），密码默认 858308533，可用环境变量 SEED_ADMIN_PASSWORD 覆盖 */
+ * 用户名 iam（也可用 iam@stu.sibaihua.com 登录），密码默认 858308533，可用环境变量 SEED_ADMIN_PASSWORD 覆盖 */
 async function seedAdmin(env) {
   if (await db.userByUsername(env, 'iam')) return;
   const seedPw = env.SEED_ADMIN_PASSWORD || '858308533';
@@ -133,7 +133,7 @@ function publicUser(u) {
     emailVerified: !!u.emailVerified,
     status: u.status,
     emailAccount: u.emailAccount,
-    campusEmail: `${u.username}@gayg.de`,
+    campusEmail: `${u.username}@stu.sibaihua.com`,
     applyError: u.applyError,
     avatarUrl: u.avatarUrl || null,
     createdAt: u.createdAt,
@@ -156,10 +156,10 @@ async function readBody(request) {
 
 /* ============================== 设置 ============================== */
 
-/* 校园邮箱域名固定为 gayg.de；校园邮箱地址由「我的E校园」用户名推导为 username@gayg.de。
-   Cloud Mail（gayg.de）平台通过「我的E校园」OAuth 登录，因此不再需要 Cloud Mail 管理员账号，
+/* 校园邮箱域名固定为 stu.sibaihua.com；校园邮箱地址由「我的E校园」用户名推导为 username@stu.sibaihua.com。
+   邮件系统域名为 mail.sibaihua.com，Cloud Mail 平台通过「我的E校园」OAuth 登录，因此不再需要 Cloud Mail 管理员账号，
    也不再自动开通邮箱。 */
-const CAMPUS_EMAIL_DOMAIN = 'gayg.de';
+const CAMPUS_EMAIL_DOMAIN = 'stu.sibaihua.com';
 async function mailDomain() {
   return CAMPUS_EMAIL_DOMAIN;
 }
@@ -965,7 +965,7 @@ async function apiDocs(ctx) {
             { name: 'code_challenge', type: 'string', required: '浏览器前端必填', desc: '由 code_verifier 计算得到' },
             { name: 'code_challenge_method', type: 'string', required: '浏览器前端必填', desc: '固定为 S256' },
           ], example: `${base}/oauth\n  ?response_type=code\n  &client_id=sib_xxx\n  &redirect_uri=${encodeURIComponent('https://portal.example.com/callback')}\n  &state=xyz\n  &code_challenge=xxxxx\n  &code_challenge_method=S256`, response: '用户确认授权后浏览器跳转到：\nhttps://portal.example.com/callback?code=8a1b...&state=xyz' },
-          { method: 'GET', path: '/api/oauth/userinfo', desc: '凭 Access Token 获取当前授权用户的基本信息。AI 助手在拿到 access_token 后应调用此接口完成登录态映射。', headers: 'Authorization: Bearer <access_token>', example: `curl ${base}/api/oauth/userinfo -H "Authorization: Bearer <access_token>"`, response: '{\n  "code": 200,\n  "message": "success",\n  "data": {\n    "id": 2,\n    "username": "zhangsan",\n    "email": "zhangsan@gayg.de",\n    "englishName": "San Zhang",\n    "contactEmail": "zhangsan@gmail.com",\n    "role": "user",\n    "status": "approved"\n  }\n}' },
+          { method: 'GET', path: '/api/oauth/userinfo', desc: '凭 Access Token 获取当前授权用户的基本信息。AI 助手在拿到 access_token 后应调用此接口完成登录态映射。', headers: 'Authorization: Bearer <access_token>', example: `curl ${base}/api/oauth/userinfo -H "Authorization: Bearer <access_token>"`, response: '{\n  "code": 200,\n  "message": "success",\n  "data": {\n    "id": 2,\n    "username": "zhangsan",\n    "email": "zhangsan@stu.sibaihua.com",\n    "englishName": "San Zhang",\n    "contactEmail": "zhangsan@gmail.com",\n    "role": "user",\n    "status": "approved"\n  }\n}' },
           { method: 'GET', path: '/api/oauth/authorize/info', desc: '授权页预检接口。AI 助手可在引导用户跳转前先调用此接口，验证 client_id 与 redirect_uri 是否有效，并获取客户端名称用于展示。', params: [
             { name: 'client_id', type: 'string', required: '是', desc: '客户端 ID' },
             { name: 'redirect_uri', type: 'string', required: '是', desc: '回调地址' },
@@ -976,13 +976,13 @@ async function apiDocs(ctx) {
         title: '二、“我的E校园”内部接口',
         desc: '本系统前端的注册、登录、验证码与入学申请均基于以下接口。AI 助手若需替用户完成批量或自动化操作，可直接调用；注意入学申请接口需要图形验证码。',
         items: [
-          { method: 'POST', path: '/api/auth/register', desc: '注册“我的E校园”账号。注册成功后默认状态为 registered，可继续完成个人联系邮箱验证并调用 /api/apply 提交入学申请。入学审核通过后，校园邮箱地址随用户名推导为 <用户名>@gayg.de；Cloud Mail（gayg.de）平台使用「我的E校园」OAuth 登录，无需单独开通邮箱。若管理后台开启 Turnstile 人机验证，则需附带 cfTurnstileToken。', params: [
+          { method: 'POST', path: '/api/auth/register', desc: '注册“我的E校园”账号。注册成功后默认状态为 registered，可继续完成个人联系邮箱验证并调用 /api/apply 提交入学申请。入学审核通过后，校园邮箱地址随用户名推导为 <用户名>@stu.sibaihua.com；Cloud Mail（mail.sibaihua.com）平台使用「我的E校园」OAuth 登录，无需单独开通邮箱。若管理后台开启 Turnstile 人机验证，则需附带 cfTurnstileToken。', params: [
             { name: 'cfTurnstileToken', type: 'string', required: '开关开启时', desc: 'Cloudflare Turnstile 前端小部件返回的 token（管理后台「系统设置」可开关）' },
-            { name: 'username', type: 'string', required: '是', desc: '至少 3 位（最长 30 位），仅限字母/数字，可含 . _ -，不能为纯数字，建议使用英文姓名或其简拼；即校园邮箱 username@gayg.de 的前缀' },
-            { name: 'password', type: 'string', required: '是', desc: '6-64 位；用于「我的E校园」登录（校园邮箱 gayg.de 通过 OAuth 登录，无需单独密码）' },
+            { name: 'username', type: 'string', required: '是', desc: '至少 3 位（最长 30 位），仅限字母/数字，可含 . _ -，不能为纯数字，建议使用英文姓名或其简拼；即校园邮箱 username@stu.sibaihua.com 的前缀' },
+            { name: 'password', type: 'string', required: '是', desc: '6-64 位；用于「我的E校园」登录（校园邮箱（mail.sibaihua.com）通过 OAuth 登录，无需单独密码）' },
           ], response: '{ "code": 200, "data": { "token": "会话令牌", "user": { "id": 3, "username": "zhangsan", "status": "registered", ... } } }' },
-          { method: 'POST', path: '/api/auth/login', desc: '登录并获取会话令牌。用户名可输入 "zhangsan" 或 "zhangsan@gayg.de"，效果相同。登录不需要人机验证。', params: [
-            { name: 'username', type: 'string', required: '是', desc: '用户名（自动忽略 @gayg.de 后缀）' },
+          { method: 'POST', path: '/api/auth/login', desc: '登录并获取会话令牌。用户名可输入 "zhangsan" 或 "zhangsan@stu.sibaihua.com"，效果相同。登录不需要人机验证。', params: [
+            { name: 'username', type: 'string', required: '是', desc: '用户名（自动忽略 @stu.sibaihua.com 后缀）' },
             { name: 'password', type: 'string', required: '是', desc: '密码' },
           ], response: '{ "code": 200, "data": { "token": "会话令牌", "user": { ... } } }' },
           { method: 'GET', path: '/api/auth/me', desc: '获取当前登录用户信息。会话令牌通过 Authorization: Bearer <token> 传递。', headers: 'Authorization: Bearer <会话令牌>', response: '{ "code": 200, "data": { "user": { ... } } }' },
@@ -993,19 +993,19 @@ async function apiDocs(ctx) {
             { name: 'email', type: 'string', required: '是', desc: '与发送验证码时一致的邮箱' },
             { name: 'code', type: 'string', required: '是', desc: '邮件中收到的 6 位验证码' },
           ], response: '{ "code": 200, "message": "邮箱验证成功", "data": { "user": { "emailVerified": true, ... } } }' },
-          { method: 'POST', path: '/api/auth/change-password', desc: '修改“我的E校园”登录密码。校园邮箱（gayg.de）通过「我的E校园」OAuth 登录，无需单独密码，因此此处仅影响「我的E校园」登录。', headers: 'Authorization: Bearer <会话令牌>', params: [
+          { method: 'POST', path: '/api/auth/change-password', desc: '修改“我的E校园”登录密码。校园邮箱（mail.sibaihua.com）通过「我的E校园」OAuth 登录，无需单独密码，因此此处仅影响「我的E校园」登录。', headers: 'Authorization: Bearer <会话令牌>', params: [
             { name: 'oldPassword', type: 'string', required: '是', desc: '原登录密码' },
             { name: 'newPassword', type: 'string', required: '是', desc: '新密码 6-64 位' },
           ], response: '{ "code": 200, "message": "密码已修改（仅同步“我的E校园”登录密码，校园邮箱密码不受影响）" }' },
           { method: 'GET', path: '/api/captcha', desc: '获取图形验证码。返回 SVG 图形与 captchaId，5 分钟有效、一次性使用。调用 /api/apply 前必须先获取并让用户识别验证码。', response: '{ "code": 200, "data": { "captchaId": "uuid", "image": "<svg ...>" } }' },
-          { method: 'POST', path: '/api/apply', desc: '提交入学申请。前置条件：个人联系邮箱已通过 /api/verify-email/* 完成验证（emailVerified=true）。验证码校验通过后自动录取。校园邮箱地址随用户名推导为 <用户名>@gayg.de，gayg.de 通过「我的E校园」OAuth 登录，系统不再自动开通邮箱。', headers: 'Authorization: Bearer <会话令牌>', params: [
+          { method: 'POST', path: '/api/apply', desc: '提交入学申请。前置条件：个人联系邮箱已通过 /api/verify-email/* 完成验证（emailVerified=true）。验证码校验通过后自动录取。校园邮箱地址随用户名推导为 <用户名>@stu.sibaihua.com，mail.sibaihua.com 通过「我的E校园」OAuth 登录，系统不再自动开通邮箱。', headers: 'Authorization: Bearer <会话令牌>', params: [
             { name: 'cfTurnstileToken', type: 'string', required: '开关开启时', desc: 'Cloudflare Turnstile token（管理后台「系统设置」可开关）' },
             { name: 'englishName', type: 'string', required: '是', desc: '英文姓名，2-60 位英文字母（可含空格、连字符、单引号、点）' },
             { name: 'contactEmail', type: 'string', required: '是', desc: '个人联系邮箱（任意域名均可），必须与已验证的邮箱完全一致' },
             { name: 'captchaId', type: 'string', required: '是', desc: '图形验证码 ID' },
             { name: 'captchaCode', type: 'string', required: '是', desc: '图形验证码字符（不区分大小写）' },
-          ], response: '{ "code": 200, "message": "入学申请已通过", "data": { "user": { "status": "approved", "campusEmail": "zhangsan@gayg.de", ... } } }' },
-          { method: 'GET', path: '/api/application/status', desc: '查询当前用户入学申请状态。', headers: 'Authorization: Bearer <会话令牌>', response: '{ "code": 200, "data": { "user": { "status": "approved", "campusEmail": "zhangsan@gayg.de", ... } } }' },
+          ], response: '{ "code": 200, "message": "入学申请已通过", "data": { "user": { "status": "approved", "campusEmail": "zhangsan@stu.sibaihua.com", ... } } }' },
+          { method: 'GET', path: '/api/application/status', desc: '查询当前用户入学申请状态。', headers: 'Authorization: Bearer <会话令牌>', response: '{ "code": 200, "data": { "user": { "status": "approved", "campusEmail": "zhangsan@stu.sibaihua.com", ... } } }' },
           { method: 'GET', path: '/api/health', desc: '健康检查。', response: '{ "code": 200, "data": { "app": "司白画大学清迈分校“我的E校园”", "time": "..." } }' },
         ],
       },
@@ -1021,7 +1021,7 @@ async function apiDocs(ctx) {
             { name: 'englishName', type: 'string', required: '否', desc: '英文姓名' },
             { name: 'contactEmail', type: 'string', required: '否', desc: '联系邮箱' },
           ], response: '{ "code": 200, "message": "用户已创建", "data": { "user": { ... } } }' },
-          { method: 'PUT', path: '/api/admin/users', desc: '编辑用户。所有字段均可选，只传需要修改的。校园邮箱由用户名推导为 <用户名>@gayg.de（gayg.de 通过「我的E校园」OAuth 登录，无需单独开通，故修改用户名会同步更新该推导值）；修改密码只更新「我的E校园」登录密码（哈希与密文），不影响 gayg.de 的 OAuth 登录。', headers: 'Authorization: Bearer <管理员会话令牌>', params: [
+          { method: 'PUT', path: '/api/admin/users', desc: '编辑用户。所有字段均可选，只传需要修改的。校园邮箱由用户名推导为 <用户名>@stu.sibaihua.com（mail.sibaihua.com 通过「我的E校园」OAuth 登录，无需单独开通，故修改用户名会同步更新该推导值）；修改密码只更新「我的E校园」登录密码（哈希与密文），不影响 mail.sibaihua.com 的 OAuth 登录。', headers: 'Authorization: Bearer <管理员会话令牌>', params: [
             { name: 'id', type: 'integer', required: '是', desc: '用户 ID' },
             { name: 'username', type: 'string', required: '否', desc: '新用户名（不能与现有用户重复）' },
             { name: 'password', type: 'string', required: '否', desc: '新密码（6-64 位，不传或空则不修改）' },
@@ -1034,14 +1034,14 @@ async function apiDocs(ctx) {
           { method: 'DELETE', path: '/api/admin/users', desc: '删除用户，并清理其所有登录会话与 OAuth 令牌。不能删除自己的账号。', headers: 'Authorization: Bearer <管理员会话令牌>', params: [
             { name: 'id', type: 'integer', required: '是', desc: '用户 ID' },
           ], response: '{ "code": 200, "message": "用户已删除", "data": null }' },
-          { method: 'GET', path: '/api/admin/settings', desc: '获取系统设置：Turnstile 人机验证开关、校园邮箱域名、图书馆入口、邮件服务配置（API Key 不返回明文）。', headers: 'Authorization: Bearer <管理员会话令牌>', response: '{ "code": 200, "data": { "campusEmailDomain": "gayg.de", "turnstileEnabled": true, "turnstileSiteKey": "0x4A...", "mail": { "provider": "mailchannels", "from": "...", "hasApiKey": true } } }' },
-          { method: 'POST', path: '/api/admin/settings', desc: '保存系统设置：Cloudflare Turnstile 人机验证开关、邮箱验证模式、图书馆入口（含 Basic 认证用户名/密码）。校园邮箱无需配置（由用户名推导为 username@gayg.de，gayg.de 通过「我的E校园」OAuth 登录）。', headers: 'Authorization: Bearer <管理员会话令牌>', params: [
+          { method: 'GET', path: '/api/admin/settings', desc: '获取系统设置：Turnstile 人机验证开关、校园邮箱域名、图书馆入口、邮件服务配置（API Key 不返回明文）。', headers: 'Authorization: Bearer <管理员会话令牌>', response: '{ "code": 200, "data": { "campusEmailDomain": "stu.sibaihua.com", "turnstileEnabled": true, "turnstileSiteKey": "0x4A...", "mail": { "provider": "mailchannels", "from": "...", "hasApiKey": true } } }' },
+          { method: 'POST', path: '/api/admin/settings', desc: '保存系统设置：Cloudflare Turnstile 人机验证开关、邮箱验证模式、图书馆入口（含 Basic 认证用户名/密码）。校园邮箱无需配置（由用户名推导为 username@stu.sibaihua.com，mail.sibaihua.com 通过「我的E校园」OAuth 登录）。', headers: 'Authorization: Bearer <管理员会话令牌>', params: [
             { name: 'turnstileEnabled', type: 'boolean', required: '否', desc: 'true=开启人机验证（默认），false=关闭；留空表示不修改' },
             { name: 'emailVerifyMode', type: 'string', required: '否', desc: 'auto / on / off；留空表示不修改' },
             { name: 'libraryUrl', type: 'string', required: '否', desc: '校园图书馆入口链接（http(s)）' },
             { name: 'libraryBasicUsername', type: 'string', required: '否', desc: '图书馆 Basic 认证用户名' },
             { name: 'libraryBasicPassword', type: 'string', required: '否', desc: '图书馆 Basic 认证密码（留空 = 不修改）' },
-          ], response: '{ "code": 200, "data": { "campusEmailDomain": "gayg.de", "turnstileEnabled": true } }' },
+          ], response: '{ "code": 200, "data": { "campusEmailDomain": "stu.sibaihua.com", "turnstileEnabled": true } }' },
           { method: 'POST', path: '/api/admin/settings/mail', desc: '保存邮件服务配置（MailChannels 通道，用于个人联系邮箱验证发信）。API Key 留空表示不修改。', headers: 'Authorization: Bearer <管理员会话令牌>', params: [
             { name: 'provider', type: 'string', required: '否', desc: '固定值：mailchannels（默认）' },
             { name: 'from', type: 'string', required: '是', desc: '发件邮箱地址（需在 MailChannels 验证过的域名下）' },
