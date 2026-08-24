@@ -135,19 +135,19 @@
     </form>
 
     <hr style="margin:28px 0;border:none;border-top:1px solid var(--border)">
-    <h2>系统设置 · 邮件服务（MailChannels）</h2>
-    <p class="muted">Cloudflare Worker 无法直连 SMTP 服务器，验证码邮件改由 <strong>MailChannels Transactional Email API</strong>（Cloudflare 生态，免费）发送。发件域名需先在 DNS 中添加 MailChannels 验证记录（详见部署 README）。用于向申请人的<strong>个人联系邮箱</strong>发送验证码邮件（入学申请前置条件）。</p>
+    <h2>系统设置 · 邮件服务（Resend）</h2>
+    <p class="muted">Cloudflare Worker 无法直连 SMTP 服务器，验证码邮件改由 <strong>Resend Transactional Email API</strong>（https://api.resend.com/emails）发送。发件域名需在 Resend 后台完成 DNS 验证。用于向申请人的<strong>个人联系邮箱</strong>发送验证码邮件（入学申请前置条件）。</p>
     <form id="smtpForm">
       <div class="form-grid">
         <label class="field"><span class="field-label">邮件通道</span>
           <select name="provider">
-            <option value="mailchannels" selected>MailChannels（推荐，Cloudflare 生态）</option>
+            <option value="resend" selected>Resend（默认邮件通道）</option>
           </select></label>
         <label class="field"><span class="field-label">发件邮箱 <em>*</em></span>
           <input name="from" type="email" required maxlength="100" placeholder="no-reply@sibh.cn"></label>
         <label class="field"><span class="field-label">发件人显示名称</span>
           <input name="fromName" maxlength="60" placeholder="司白画大学清迈分校 · 我的E校园"></label>
-        <label class="field"><span class="field-label">MailChannels API Key（留空不修改）</span>
+        <label class="field"><span class="field-label">Resend API Key（留空不修改）</span>
           <input name="apiKey" type="password" maxlength="200" placeholder="留空保持当前 Key 不变" autocomplete="new-password"></label>
         <label class="field"><span class="field-label">测试收件邮箱（仅测试用）</span>
           <input name="to" type="email" maxlength="100" placeholder="留空则发送到发件邮箱"></label>
@@ -388,7 +388,7 @@ async function loadSettings() {
 
   const mail = r.data.mail || {};
   const sForm = document.getElementById('smtpForm');
-  sForm.provider.value = mail.provider || 'mailchannels';
+  sForm.provider.value = mail.provider || 'resend';
   sForm.from.value = mail.from || '';
   sForm.fromName.value = mail.fromName || '';
   sForm.apiKey.value = '';
@@ -431,7 +431,7 @@ document.getElementById('settingsForm').onsubmit = async (e) => {
 function smtpPayload() {
   const fd = new FormData(document.getElementById('smtpForm'));
   return {
-    provider: fd.get('provider') || 'mailchannels',
+    provider: fd.get('provider') || 'resend',
     from: fd.get('from'),
     fromName: fd.get('fromName'),
     apiKey: fd.get('apiKey') || '',

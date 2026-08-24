@@ -105,7 +105,7 @@ if (s.mailAdminEmail) sql.push(`INSERT INTO settings (key, value) VALUES ('mail_
 if (s.mailAdminPassword) sql.push(`INSERT INTO settings (key, value) VALUES ('mail_admin_password', '${esc(s.mailAdminPassword)}');`);
 sql.push(`INSERT INTO settings (key, value) VALUES ('turnstile_enabled', '${s.turnstileEnabled === false || s.turnstileEnabled === '0' ? '0' : '1'}');`);
 if (s.smtp && s.smtp.from) {
-  sql.push(`INSERT INTO settings (key, value) VALUES ('mail_provider_json', '${esc(JSON.stringify({ provider: 'mailchannels', from: s.smtp.from, fromName: s.smtp.fromName || '', domain: (s.smtp.from || '').split('@')[1] || '', apiKey: '' }))}');`);
+  sql.push(`INSERT INTO settings (key, value) VALUES ('mail_provider_json', '${esc(JSON.stringify({ provider: 'resend', from: s.smtp.from, fromName: s.smtp.fromName || '', domain: (s.smtp.from || '').split('@')[1] || '', apiKey: '' }))}');`);
 }
 
 /* ---------- 4) 未过期的会话 / OAuth 令牌（可选，易失数据） ---------- */

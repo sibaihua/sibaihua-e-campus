@@ -3,7 +3,7 @@
  * 由原 sibaihua-admission/server.js（零依赖 Node）迁移而来：
  *   - 存储：db.json 内存对象 → Cloudflare D1（src/db.js）
  *   - 密码：scrypt → PBKDF2（Web Crypto，src/auth.js）
- *   - 发信：SMTP(net/tls) → MailChannels API（src/mail.js）
+ *   - 发信：SMTP(net/tls) → Resend API（src/mail.js）
  *   - 其余接口路径与响应结构与原版完全一致，前端无需改动
  */
 'use strict';
@@ -665,7 +665,7 @@ async function hAdminMailGet(ctx) {
 async function hAdminMailSave(ctx) {
   requireAdmin(ctx.user);
   const { body, env } = ctx;
-  const provider = body.provider === 'custom' ? 'custom' : 'mailchannels';
+  const provider = body.provider === 'custom' ? 'custom' : 'resend';
   const from = String(body.from || '').trim();
   const fromName = String(body.fromName || '').trim();
   if (!from) throw new ApiError(400, '发件邮箱不能为空');
@@ -687,7 +687,7 @@ async function hAdminMailTest(ctx) {
   const { body, env } = ctx;
   const cur = await getMailProvider(env, db);
   const cfg = {
-    provider: body.provider === 'custom' ? 'custom' : 'mailchannels',
+    provider: body.provider === 'custom' ? 'custom' : 'resend',
     from: String(body.from || '').trim() || cur.from,
     fromName: String(body.fromName || '').trim() || cur.fromName,
     domain: (String(body.from || '').trim() || cur.from).split('@')[1] || '',
@@ -1024,7 +1024,7 @@ async function apiDocs(ctx) {
           { method: 'DELETE', path: '/api/admin/users', desc: '删除用户，并清理其所有登录会话与 OAuth 令牌。不能删除自己的账号。', headers: 'Authorization: Bearer <管理员会话令牌>', params: [
             { name: 'id', type: 'integer', required: '是', desc: '用户 ID' },
           ], response: '{ "code": 200, "message": "用户已删除", "data": null }' },
-          { method: 'GET', path: '/api/admin/settings', desc: '获取系统设置：Turnstile 人机验证开关、校园邮箱域名、图书馆入口、邮件服务配置（API Key 不返回明文）。', headers: 'Authorization: Bearer <管理员会话令牌>', response: '{ "code": 200, "data": { "campusEmailDomain": "stu.sibaihua.com", "turnstileEnabled": true, "turnstileSiteKey": "0x4A...", "mail": { "provider": "mailchannels", "from": "...", "hasApiKey": true } } }' },
+          { method: 'GET', path: '/api/admin/settings', desc: '获取系统设置：Turnstile 人机验证开关、校园邮箱域名、图书馆入口、邮件服务配置（API Key 不返回明文）。', headers: 'Authorization: Bearer <管理员会话令牌>', response: '{ "code": 200, "data": { "campusEmailDomain": "stu.sibaihua.com", "turnstileEnabled":   true, "turnstileSiteKey": "0x4A...", "mail": { "provider": "resend", "from": "...", "hasApiKey": true } } }' },
           { method: 'POST', path: '/api/admin/settings', desc: '保存系统设置：Cloudflare Turnstile 人机验证开关、邮箱验证模式、图书馆入口（含 Basic 认证用户名/密码）。校园邮箱无需配置（由用户名推导为 username@stu.sibaihua.com，校园邮箱通过「我的E校园」OAuth 登录）。', headers: 'Authorization: Bearer <管理员会话令牌>', params: [
             { name: 'turnstileEnabled', type: 'boolean', required: '否', desc: 'true=开启人机验证（默认），false=关闭；留空表示不修改' },
             { name: 'emailVerifyMode', type: 'string', required: '否', desc: 'auto / on / off；留空表示不修改' },
@@ -1032,11 +1032,11 @@ async function apiDocs(ctx) {
             { name: 'libraryBasicUsername', type: 'string', required: '否', desc: '图书馆 Basic 认证用户名' },
             { name: 'libraryBasicPassword', type: 'string', required: '否', desc: '图书馆 Basic 认证密码（留空 = 不修改）' },
           ], response: '{ "code": 200, "data": { "campusEmailDomain": "stu.sibaihua.com", "turnstileEnabled": true } }' },
-          { method: 'POST', path: '/api/admin/settings/mail', desc: '保存邮件服务配置（MailChannels 通道，用于个人联系邮箱验证发信）。API Key 留空表示不修改。', headers: 'Authorization: Bearer <管理员会话令牌>', params: [
-            { name: 'provider', type: 'string', required: '否', desc: '固定值：mailchannels（默认）' },
-            { name: 'from', type: 'string', required: '是', desc: '发件邮箱地址（需在 MailChannels 验证过的域名下）' },
+          { method: 'POST', path: '/api/admin/settings/mail', desc: '保存邮件服务配置（Resend 通道，用于个人联系邮箱验证发信）。API Key 留空表示不修改。', headers: 'Authorization: Bearer <管理员会话令牌>',  params: [
+            { name: 'provider', type: 'string', required: '否', desc: '固定值：resend（默认）' },
+            { name: 'from', type: 'string', required: '是', desc: '发件邮箱地址（需在 Resend 验证过的域名下）' },
             { name: 'fromName', type: 'string', required: '否', desc: '发件人显示名称' },
-            { name: 'apiKey', type: 'string', required: '否', desc: 'MailChannels API Key（留空 = 不修改）' },
+            { name: 'apiKey', type: 'string', required: '否', desc: 'Resend API Key（留空 = 不修改）' },
           ], response: '{ "code": 200, "message": "邮件服务配置已保存", "data": { "mail": { ... } } }' },
           { method: 'POST', path: '/api/admin/settings/test-mail', desc: '使用提交的（或已保存的）邮件服务配置向指定邮箱发送一封测试邮件，用于验证连通性。', headers: 'Authorization: Bearer <管理员会话令牌>', params: [
             { name: 'to', type: 'string', required: '否', desc: '测试收件邮箱，缺省发送到发件邮箱本身' },

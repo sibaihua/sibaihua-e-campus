@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "司白画大学清迈分校「我的E校园」— Cloudflare Worker 版（D1 存储 + MailChannels 发信）",
+  "description": "司白画大学清迈分校「我的E校园」— Cloudflare Worker 版（D1 存储 + Resend 发信）",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
