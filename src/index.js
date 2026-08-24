@@ -12,7 +12,6 @@ import db from './db.js';
 import {
   hashPassword, verifyPassword, encryptPassword, decryptPassword,
 } from './auth.js';
-import { genCaptchaCode, makeCaptchaSvg } from './captcha.js';
 import {
   sendMail, getMailProvider, saveMailProvider, mailVerifyCodeHtml, mailTestHtml,
 } from './mail.js';
@@ -43,7 +42,6 @@ const CONFIG = {
   sessionTtlMs: 7 * 24 * 3600 * 1000,
   accessTokenTtlMs: 2 * 3600 * 1000,
   oauthCodeTtlMs: 5 * 60 * 1000,
-  captchaTtlMs: 5 * 60 * 1000,
   emailCodeTtlMs: 10 * 60 * 1000,
   emailCodeCooldownMs: 60 * 1000,
   libraryUrlDefault: 'https://102007.xyz',
@@ -327,15 +325,7 @@ async function hChangePassword(ctx) {
   return ok(null, '密码已修改（仅同步“我的E校园”登录密码，校园邮箱密码不受影响）');
 }
 
-/* ============================== 验证码 / 邮箱验证 / 入学申请 ============================== */
-
-async function hCaptcha(ctx) {
-  const { env } = ctx;
-  const code = genCaptchaCode();
-  const id = randomHex(16);
-  await db.createCaptcha(env, id, code, Date.now() + CONFIG.captchaTtlMs);
-  return ok({ captchaId: id, image: makeCaptchaSvg(code) });
-}
+/* ============================== 邮箱验证 / 入学申请 ============================== */
 
 async function hApplyStatus(ctx) {
   return ok({ user: publicUser(ctx.user) });
@@ -431,12 +421,6 @@ async function hApply(ctx) {
   if (!tsOk) throw new ApiError(400, '人机验证未通过，请完成验证后重试');
   if (user.role === 'admin') throw new ApiError(400, '管理员账号无需申请入学');
   if (user.status === 'approved') return ok({ user: publicUser(user) }, '入学申请已通过，无需重复申请');
-
-  const captchaId = String(body.captchaId || '');
-  const cap = await db.getCaptcha(env, captchaId);
-  await db.deleteCaptcha(env, captchaId);
-  if (!cap || cap.expiresAt < Date.now()) throw new ApiError(400, '验证码已过期，请点击图片刷新后重试');
-  if (String(body.captchaCode || '').trim().toUpperCase() !== cap.code) throw new ApiError(400, '验证码不正确');
 
   const englishName = String(body.englishName || '').trim();
   if (!/^[A-Za-z][A-Za-z .'\-]{1,59}$/.test(englishName)) {
@@ -987,13 +971,10 @@ async function apiDocs(ctx) {
             { name: 'oldPassword', type: 'string', required: '是', desc: '原登录密码' },
             { name: 'newPassword', type: 'string', required: '是', desc: '新密码 6-64 位' },
           ], response: '{ "code": 200, "message": "密码已修改（仅同步“我的E校园”登录密码，校园邮箱密码不受影响）" }' },
-          { method: 'GET', path: '/api/captcha', desc: '获取图形验证码。返回 SVG 图形与 captchaId，5 分钟有效、一次性使用。调用 /api/apply 前必须先获取并让用户识别验证码。', response: '{ "code": 200, "data": { "captchaId": "uuid", "image": "<svg ...>" } }' },
           { method: 'POST', path: '/api/apply', desc: '提交入学申请。前置条件：个人联系邮箱已通过 /api/verify-email/* 完成验证（emailVerified=true）。验证码校验通过后自动录取（status=approved）。录取后校园邮箱地址即为 <用户名>@stu.sibaihua.com，但不会立即开通；需前往校园邮箱平台（mail.sibaihua.com）使用「我的E校园」账号完成 OAuth 登录后才会自动开通。', headers: 'Authorization: Bearer <会话令牌>', params: [
             { name: 'cfTurnstileToken', type: 'string', required: '开关开启时', desc: 'Cloudflare Turnstile token（管理后台「系统设置」可开关）' },
             { name: 'englishName', type: 'string', required: '是', desc: '英文姓名，2-60 位英文字母（可含空格、连字符、单引号、点）' },
             { name: 'contactEmail', type: 'string', required: '是', desc: '个人联系邮箱（任意域名均可），必须与已验证的邮箱完全一致' },
-            { name: 'captchaId', type: 'string', required: '是', desc: '图形验证码 ID' },
-            { name: 'captchaCode', type: 'string', required: '是', desc: '图形验证码字符（不区分大小写）' },
           ], response: '{ "code": 200, "message": "入学申请已通过", "data": { "user": { "status": "approved", "campusEmail": "zhangsan@stu.sibaihua.com", ... } } }' },
           { method: 'GET', path: '/api/application/status', desc: '查询当前用户入学申请状态。', headers: 'Authorization: Bearer <会话令牌>', response: '{ "code": 200, "data": { "user": { "status": "approved", "campusEmail": "zhangsan@stu.sibaihua.com", ... } } }' },
           { method: 'GET', path: '/api/health', desc: '健康检查。', response: '{ "code": 200, "data": { "app": "司白画大学清迈分校“我的E校园”", "time": "..." } }' },
@@ -1086,7 +1067,6 @@ const routes = [
     return hChangePassword(ctx);
   }],
 
-  ['GET', /^\/api\/captcha$/, hCaptcha],
   ['POST', /^\/api\/verify-email\/send$/, async (ctx) => {
     if (!ctx.user) throw new ApiError(401, '未登录或登录已过期');
     return hVerifyEmailSend(ctx);

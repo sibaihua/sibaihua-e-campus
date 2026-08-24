@@ -56,11 +56,6 @@ CREATE TABLE IF NOT EXISTS oauth_clients (
   created_at    TEXT NOT NULL,
   updated_at    TEXT
 );
-CREATE TABLE IF NOT EXISTS captchas (
-  id         TEXT PRIMARY KEY,
-  code       TEXT NOT NULL,
-  expires_at INTEGER NOT NULL
-);
 CREATE TABLE IF NOT EXISTS email_verifications (
   user_id      INTEGER PRIMARY KEY,
   email        TEXT NOT NULL,

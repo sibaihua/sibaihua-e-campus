@@ -29,7 +29,7 @@
 renderBrand(document.getElementById('brandBox'));
 document.getElementById('logoutBtn').onclick = logout;
 
-const state = { user: null, captchaId: null, emailSent: false, pubCfg: null };
+const state = { user: null, emailSent: false, pubCfg: null };
 const main = document.getElementById('main');
 
 /* 密码体系提示（首次开通邮箱时展示） */
@@ -98,15 +98,6 @@ function renderChip() {
   document.getElementById('adminLink').hidden = u.role !== 'admin';
 }
 
-/* ---------- 图形验证码 ---------- */
-async function loadCaptcha() {
-  const r = await API.get('/api/captcha');
-  if (r.code !== 200) return;
-  state.captchaId = r.data.captchaId;
-  const box = document.getElementById('captchaBox');
-  if (box) box.innerHTML = r.data.image;
-}
-
 /* ---------- 主渲染 ---------- */
 function render() {
   renderChip();
@@ -115,11 +106,11 @@ function render() {
   renderPanel('apply', u.role === 'admin' ? renderAdminCard() : (u.status === 'approved' ? renderApproved() : renderApplyForm()));
   renderPanel('profile', renderProfile());
   renderPanel('account', renderAccount());
-  // 重渲染后重新初始化仅出现在申请表单中的图形验证码与 Turnstile，
-  // 否则（如邮箱验证成功后）render 重建的空白容器会丢失这两个组件。
+  // 重渲染后重新绑定各面板事件（onsubmit 等），否则新节点无事件绑定，
+  // 会导致提交按钮无响应（表单默认提交造成页面刷新）。
+  bindProfile();
   if (u.role !== 'admin' && u.status !== 'approved' && state.pubCfg) {
-    loadCaptcha();
-    if (state.pubCfg.turnstileEnabled) maybeRenderTurnstile('tsApply');
+    bindApplyForm();
   }
 }
 
@@ -234,15 +225,6 @@ function renderApplyForm() {
         <div class="field">
           <span class="field-label">个人联系邮箱（Contact Email）<em>*</em></span>
           ${emailRow}
-        </div>
-
-        <div class="field">
-          <span class="field-label">图形验证码 <em>*</em></span>
-          <div class="captcha-row">
-            <div class="captcha-box" id="captchaBox" title="点击刷新验证码"></div>
-            <input name="captchaCode" placeholder="输入左侧字符" required maxlength="6" autocomplete="off">
-          </div>
-          <div class="captcha-hint">看不清？点击图片刷新</div>
         </div>
 
         <div class="field">
@@ -471,9 +453,6 @@ function renderAccount() {
 function bindApplyForm() {
   const form = document.getElementById('applyForm');
   if (!form) return;
-  const box = document.getElementById('captchaBox');
-  if (box) box.onclick = loadCaptcha;
-  loadCaptcha();
   maybeRenderTurnstile('tsApply');
   renderEmailVerify('emailVerifyBox', { emailInput: 'contactEmail', sendBtnId: 'sendCodeBtn', onVerified: () => {} });
 
@@ -501,8 +480,6 @@ function bindApplyForm() {
       const r = await API.post('/api/apply', {
         englishName: fd.get('englishName'),
         contactEmail,
-        captchaId: state.captchaId,
-        captchaCode: fd.get('captchaCode'),
         cfTurnstileToken: ts,
       });
       if (r.code === 200 && r.data && r.data.user) {
@@ -510,8 +487,6 @@ function bindApplyForm() {
         render();
       } else {
         err.textContent = r.message || '申请失败，请重试';
-        state.captchaId = null;
-        loadCaptcha();
         if (cfg.turnstileEnabled) tsReset('tsApply');
       }
     } finally {
