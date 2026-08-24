@@ -115,6 +115,12 @@ function render() {
   renderPanel('apply', u.role === 'admin' ? renderAdminCard() : (u.status === 'approved' ? renderApproved() : renderApplyForm()));
   renderPanel('profile', renderProfile());
   renderPanel('account', renderAccount());
+  // 重渲染后重新初始化仅出现在申请表单中的图形验证码与 Turnstile，
+  // 否则（如邮箱验证成功后）render 重建的空白容器会丢失这两个组件。
+  if (u.role !== 'admin' && u.status !== 'approved' && state.pubCfg) {
+    loadCaptcha();
+    if (state.pubCfg.turnstileEnabled) maybeRenderTurnstile('tsApply');
+  }
 }
 
 function renderPanel(name, html) {
