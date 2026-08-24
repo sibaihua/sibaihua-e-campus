@@ -33,7 +33,7 @@ const state = { user: null, captchaId: null, emailSent: false, pubCfg: null };
 const main = document.getElementById('main');
 
 /* 密码体系提示（首次开通邮箱时展示） */
-const PASSWORD_NOTE = '温馨提示：校园邮箱（mail.sibaihua.com）通过「我的E校园」OAuth 授权登录，无需单独设置密码；此处仅管理「我的E校园」登录密码。';
+const PASSWORD_NOTE = '温馨提示：校园邮箱通过「我的E校园」OAuth 授权登录，无需单独设置密码；此处仅管理「我的E校园」登录密码。';
 
 const CHECK_SVG = `
 <svg class="success-icon" width="76" height="76" viewBox="0 0 76 76" aria-hidden="true">
@@ -163,7 +163,7 @@ function renderApproved() {
           <div class="account-row"><span>校园邮箱</span>
             <strong>${esc(u.campusEmail || u.emailAccount || (u.username + '@stu.sibaihua.com'))}
               <button class="copy-btn" type="button" id="copyMail">复制</button></strong></div>
-          <div class="account-row"><span>登录方式</span><strong>mail.sibaihua.com 使用「我的E校园」OAuth 授权登录，无需单独密码</strong></div>
+          <div class="account-row"><span>登录方式</span><strong>校园邮箱使用「我的E校园」OAuth 授权登录，无需单独密码</strong></div>
         </div>
       </div>
       <div class="alert alert-info">${PASSWORD_NOTE}</div>
@@ -216,7 +216,7 @@ function renderApplyForm() {
       <div class="card-head">
         <h2>入学申请</h2>
         <p class="muted">填写英文姓名与个人联系邮箱提交申请。申请提交后<strong>自动审核通过</strong>。你的校园邮箱为
-          <strong>${esc(u.username)}@stu.sibaihua.com</strong>，登录 mail.sibaihua.com 时使用「我的E校园」账号通过 OAuth 授权即可，无需单独开通。</p>
+          <strong>${esc(u.username)}@stu.sibaihua.com</strong>，登录校园邮箱时使用「我的E校园」账号通过 OAuth 授权即可，无需单独开通。</p>
       </div>
       ${failTip}
       <form id="applyForm">
@@ -324,7 +324,7 @@ function renderProfile() {
   return `
     <section class="card main-card">
       <div class="card-head"><h2>个人设置 · 登录密码</h2>
-        <p class="muted">校园邮箱（mail.sibaihua.com）通过「我的E校园」OAuth 登录，无需单独密码；此处仅修改「我的E校园」登录密码。</p></div>
+        <p class="muted">校园邮箱通过「我的E校园」OAuth 登录，无需单独密码；此处仅修改「我的E校园」登录密码。</p></div>
       <form id="pwForm">
         <label class="field"><span class="field-label">原密码 <em>*</em></span>
           <input name="oldPassword" type="password" required maxlength="64" autocomplete="current-password"></label>
