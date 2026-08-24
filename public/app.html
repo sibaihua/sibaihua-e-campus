@@ -262,14 +262,17 @@ function renderEmailVerify(container, { emailInput, sendBtnId, onVerified }) {
     return;
   }
   const sendBtn = document.getElementById(sendBtnId);
+  const codeId = container + '_code';
+  const confirmId = container + '_confirm';
+  const hintId = container + '_hint';
   box.innerHTML = `
     <div class="email-code-row">
-      <input id="emailCode" placeholder="输入邮件中的 6 位验证码" maxlength="6" autocomplete="off">
-      <button class="btn btn-ghost" type="button" id="confirmCodeBtn">验证</button>
+      <input id="${codeId}" placeholder="输入邮件中的 6 位验证码" maxlength="6" autocomplete="off">
+      <button class="btn btn-ghost" type="button" id="${confirmId}">验证</button>
     </div>
-    <div class="captcha-hint" id="emailVerifyHint"></div>`;
+    <div class="captcha-hint" id="${hintId}"></div>`;
 
-  const hint = document.getElementById('emailVerifyHint');
+  const hint = document.getElementById(hintId);
   const send = async () => {
     const email = document.getElementById(emailInput).value.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -286,9 +289,9 @@ function renderEmailVerify(container, { emailInput, sendBtnId, onVerified }) {
   };
   if (sendBtn) sendBtn.onclick = send;
 
-  document.getElementById('confirmCodeBtn').onclick = async () => {
+  document.getElementById(confirmId).onclick = async () => {
     const email = document.getElementById(emailInput).value.trim();
-    const code = document.getElementById('emailCode').value.trim();
+    const code = document.getElementById(codeId).value.trim();
     if (!code) { hint.textContent = '请输入验证码'; hint.style.color = 'var(--danger)'; return; }
     const r = await API.post('/api/verify-email/confirm', { email, code });
     if (r.code === 200 && r.data && r.data.user) {
