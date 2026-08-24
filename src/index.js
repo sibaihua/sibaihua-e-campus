@@ -159,7 +159,7 @@ async function readBody(request) {
 /* ============================== 设置 ============================== */
 
 /* 校园邮箱域名固定为 stu.sibaihua.com；校园邮箱地址由「我的E校园」用户名推导为 username@stu.sibaihua.com。
-   邮件系统域名为 mail.sibaihua.com，Cloud Mail 平台通过「我的E校园」OAuth 登录，因此不再需要 Cloud Mail 管理员账号，
+   邮件系统域名为 mail.sibaihua.com，校园邮箱平台通过「我的E校园」OAuth 登录，因此不再需要校园邮箱管理员账号，
    也不再自动开通邮箱。 */
 const CAMPUS_EMAIL_DOMAIN = 'stu.sibaihua.com';
 async function mailDomain() {
@@ -978,10 +978,10 @@ async function apiDocs(ctx) {
         title: '二、“我的E校园”内部接口',
         desc: '本系统前端的注册、登录、验证码与入学申请均基于以下接口。AI 助手若需替用户完成批量或自动化操作，可直接调用；注意入学申请接口需要图形验证码。',
         items: [
-          { method: 'POST', path: '/api/auth/register', desc: '注册“我的E校园”账号。注册成功后默认状态为 registered，可继续完成个人联系邮箱验证并调用 /api/apply 提交入学申请。入学审核通过后，校园邮箱地址随用户名推导为 <用户名>@stu.sibaihua.com；Cloud Mail（mail.sibaihua.com）平台使用「我的E校园」OAuth 登录，无需单独开通邮箱。若管理后台开启 Turnstile 人机验证，则需附带 cfTurnstileToken。', params: [
+          { method: 'POST', path: '/api/auth/register', desc: '注册“我的E校园”账号。注册成功后默认状态为 registered，可继续完成个人联系邮箱验证并调用 /api/apply 提交入学申请。入学审核通过后，校园邮箱地址即为 <用户名>@stu.sibaihua.com；校园邮箱平台使用「我的E校园」OAuth 登录，无需单独开通邮箱。若管理后台开启 Turnstile 人机验证，则需附带 cfTurnstileToken。', params: [
             { name: 'cfTurnstileToken', type: 'string', required: '开关开启时', desc: 'Cloudflare Turnstile 前端小部件返回的 token（管理后台「系统设置」可开关）' },
             { name: 'username', type: 'string', required: '是', desc: '至少 3 位（最长 30 位），仅限字母/数字，可含 . _ -，不能为纯数字，建议使用英文姓名或其简拼；即校园邮箱 username@stu.sibaihua.com 的前缀' },
-            { name: 'password', type: 'string', required: '是', desc: '6-64 位；用于「我的E校园」登录（校园邮箱（mail.sibaihua.com）通过 OAuth 登录，无需单独密码）' },
+            { name: 'password', type: 'string', required: '是', desc: '6-64 位；用于「我的E校园」登录（校园邮箱通过 OAuth 登录，无需单独密码）' },
           ], response: '{ "code": 200, "data": { "token": "会话令牌", "user": { "id": 3, "username": "zhangsan", "status": "registered", ... } } }' },
           { method: 'POST', path: '/api/auth/login', desc: '登录并获取会话令牌。用户名可输入 "zhangsan" 或 "zhangsan@stu.sibaihua.com"，效果相同。登录不需要人机验证。', params: [
             { name: 'username', type: 'string', required: '是', desc: '用户名（自动忽略 @stu.sibaihua.com 后缀）' },
@@ -995,12 +995,12 @@ async function apiDocs(ctx) {
             { name: 'email', type: 'string', required: '是', desc: '与发送验证码时一致的邮箱' },
             { name: 'code', type: 'string', required: '是', desc: '邮件中收到的 6 位验证码' },
           ], response: '{ "code": 200, "message": "邮箱验证成功", "data": { "user": { "emailVerified": true, ... } } }' },
-          { method: 'POST', path: '/api/auth/change-password', desc: '修改“我的E校园”登录密码。校园邮箱（mail.sibaihua.com）通过「我的E校园」OAuth 登录，无需单独密码，因此此处仅影响「我的E校园」登录。', headers: 'Authorization: Bearer <会话令牌>', params: [
+          { method: 'POST', path: '/api/auth/change-password', desc: '修改“我的E校园”登录密码。校园邮箱通过「我的E校园」OAuth 登录，无需单独密码，因此此处仅影响「我的E校园」登录。', headers: 'Authorization: Bearer <会话令牌>', params: [
             { name: 'oldPassword', type: 'string', required: '是', desc: '原登录密码' },
             { name: 'newPassword', type: 'string', required: '是', desc: '新密码 6-64 位' },
           ], response: '{ "code": 200, "message": "密码已修改（仅同步“我的E校园”登录密码，校园邮箱密码不受影响）" }' },
           { method: 'GET', path: '/api/captcha', desc: '获取图形验证码。返回 SVG 图形与 captchaId，5 分钟有效、一次性使用。调用 /api/apply 前必须先获取并让用户识别验证码。', response: '{ "code": 200, "data": { "captchaId": "uuid", "image": "<svg ...>" } }' },
-          { method: 'POST', path: '/api/apply', desc: '提交入学申请。前置条件：个人联系邮箱已通过 /api/verify-email/* 完成验证（emailVerified=true）。验证码校验通过后自动录取。校园邮箱地址随用户名推导为 <用户名>@stu.sibaihua.com，mail.sibaihua.com 通过「我的E校园」OAuth 登录，系统不再自动开通邮箱。', headers: 'Authorization: Bearer <会话令牌>', params: [
+          { method: 'POST', path: '/api/apply', desc: '提交入学申请。前置条件：个人联系邮箱已通过 /api/verify-email/* 完成验证（emailVerified=true）。验证码校验通过后自动录取。校园邮箱地址即为 <用户名>@stu.sibaihua.com，校园邮箱通过「我的E校园」OAuth 登录，系统不再自动开通邮箱。', headers: 'Authorization: Bearer <会话令牌>', params: [
             { name: 'cfTurnstileToken', type: 'string', required: '开关开启时', desc: 'Cloudflare Turnstile token（管理后台「系统设置」可开关）' },
             { name: 'englishName', type: 'string', required: '是', desc: '英文姓名，2-60 位英文字母（可含空格、连字符、单引号、点）' },
             { name: 'contactEmail', type: 'string', required: '是', desc: '个人联系邮箱（任意域名均可），必须与已验证的邮箱完全一致' },
@@ -1023,7 +1023,7 @@ async function apiDocs(ctx) {
             { name: 'englishName', type: 'string', required: '否', desc: '英文姓名' },
             { name: 'contactEmail', type: 'string', required: '否', desc: '联系邮箱' },
           ], response: '{ "code": 200, "message": "用户已创建", "data": { "user": { ... } } }' },
-          { method: 'PUT', path: '/api/admin/users', desc: '编辑用户。所有字段均可选，只传需要修改的。校园邮箱由用户名推导为 <用户名>@stu.sibaihua.com（mail.sibaihua.com 通过「我的E校园」OAuth 登录，无需单独开通，故修改用户名会同步更新该推导值）；修改密码只更新「我的E校园」登录密码（哈希与密文），不影响 mail.sibaihua.com 的 OAuth 登录。', headers: 'Authorization: Bearer <管理员会话令牌>', params: [
+          { method: 'PUT', path: '/api/admin/users', desc: '编辑用户。所有字段均可选，只传需要修改的。校园邮箱由用户名推导为 <用户名>@stu.sibaihua.com（校园邮箱通过「我的E校园」OAuth 登录，无需单独开通，故修改用户名会同步更新该推导值）；修改密码只更新「我的E校园」登录密码（哈希与密文），不影响校园邮箱的 OAuth 登录。', headers: 'Authorization: Bearer <管理员会话令牌>', params: [
             { name: 'id', type: 'integer', required: '是', desc: '用户 ID' },
             { name: 'username', type: 'string', required: '否', desc: '新用户名（不能与现有用户重复）' },
             { name: 'password', type: 'string', required: '否', desc: '新密码（6-64 位，不传或空则不修改）' },
@@ -1037,7 +1037,7 @@ async function apiDocs(ctx) {
             { name: 'id', type: 'integer', required: '是', desc: '用户 ID' },
           ], response: '{ "code": 200, "message": "用户已删除", "data": null }' },
           { method: 'GET', path: '/api/admin/settings', desc: '获取系统设置：Turnstile 人机验证开关、校园邮箱域名、图书馆入口、邮件服务配置（API Key 不返回明文）。', headers: 'Authorization: Bearer <管理员会话令牌>', response: '{ "code": 200, "data": { "campusEmailDomain": "stu.sibaihua.com", "turnstileEnabled": true, "turnstileSiteKey": "0x4A...", "mail": { "provider": "mailchannels", "from": "...", "hasApiKey": true } } }' },
-          { method: 'POST', path: '/api/admin/settings', desc: '保存系统设置：Cloudflare Turnstile 人机验证开关、邮箱验证模式、图书馆入口（含 Basic 认证用户名/密码）。校园邮箱无需配置（由用户名推导为 username@stu.sibaihua.com，mail.sibaihua.com 通过「我的E校园」OAuth 登录）。', headers: 'Authorization: Bearer <管理员会话令牌>', params: [
+          { method: 'POST', path: '/api/admin/settings', desc: '保存系统设置：Cloudflare Turnstile 人机验证开关、邮箱验证模式、图书馆入口（含 Basic 认证用户名/密码）。校园邮箱无需配置（由用户名推导为 username@stu.sibaihua.com，校园邮箱通过「我的E校园」OAuth 登录）。', headers: 'Authorization: Bearer <管理员会话令牌>', params: [
             { name: 'turnstileEnabled', type: 'boolean', required: '否', desc: 'true=开启人机验证（默认），false=关闭；留空表示不修改' },
             { name: 'emailVerifyMode', type: 'string', required: '否', desc: 'auto / on / off；留空表示不修改' },
             { name: 'libraryUrl', type: 'string', required: '否', desc: '校园图书馆入口链接（http(s)）' },
