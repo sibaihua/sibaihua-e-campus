@@ -20,34 +20,13 @@ import { makeDbInit } from './schema.js';
 
 const ensureDb = makeDbInit();
 
-/* 首次使用预置管理员（幂等）：新部署无需任何配置即可登录管理后台
- * 用户名 iam（也可用 iam@stu.sibaihua.com 登录），密码默认 858308533，可用环境变量 SEED_ADMIN_PASSWORD 覆盖 */
-async function seedAdmin(env) {
-  if (await db.userByUsername(env, 'iam')) return;
-  const seedPw = env.SEED_ADMIN_PASSWORD || '858308533';
-  const salt = randomHex(16);
-  await db.createUser(env, {
-    username: 'iam',
-    salt,
-    passwordHash: await hashPassword(seedPw, salt),
-    passwordEnc: await encryptPassword(env, seedPw),
-    role: 'admin',
-    englishName: 'Administrator',
-    status: 'approved',
-    emailAccount: `iam@${await mailDomain(env)}`,
-    createdAt: new Date().toISOString(),
-  });
-  console.log('[seed] 已创建管理员账号 iam');
-}
-
 let readyPromise = null;
 async function ensureReady(env) {
   if (!readyPromise) {
     readyPromise = (async () => {
       await ensureDb(env);
-      await seedAdmin(env);
     })().catch((e) => {
-      readyPromise = null; // 失败则下次请求重试
+      readyPromise =  null; // 失败则下次请求重试
       throw e;
     });
   }
