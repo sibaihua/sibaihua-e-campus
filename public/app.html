@@ -483,7 +483,9 @@ function bindApplyForm() {
     const err = document.getElementById('formErr');
     err.textContent = '';
     const fd = new FormData(form);
-    const contactEmail = fd.get('contactEmail');
+    // 已验证后 contactEmail 输入框会被 disabled，其值与 FormData 一并被丢弃，
+    // 因此回退到 state.user.contactEmail（权威的已验证值）；统一小写以消除大小写差异。
+    const contactEmail = String(fd.get('contactEmail') || state.user.contactEmail || '').trim().toLowerCase();
     const cfg = state.pubCfg || await getPublicConfig();
     if (cfg.emailVerifyEnabled && (!state.user.emailVerified || state.user.contactEmail !== contactEmail)) {
       err.textContent = '请先完成个人联系邮箱验证';
