@@ -159,8 +159,8 @@ async function readBody(request) {
 /* ============================== 设置 ============================== */
 
 /* 校园邮箱域名固定为 stu.sibaihua.com；校园邮箱地址由「我的E校园」用户名推导为 username@stu.sibaihua.com。
-   邮件系统域名为 mail.sibaihua.com，校园邮箱平台通过「我的E校园」OAuth 登录，因此不再需要校园邮箱管理员账号，
-   也不再自动开通邮箱。 */
+   邮件系统域名为 mail.sibaihua.com，校园邮箱平台通过「我的E校园」OAuth 登录（首次登录后自动开通），因此不再需要校园邮箱管理员账号。
+   仅入学申请已通过（status=approved）的用户可使用该 OAuth 授权；未申请或入学失败（status=failed）的用户将被拒绝。 */
 const CAMPUS_EMAIL_DOMAIN = 'stu.sibaihua.com';
 async function mailDomain() {
   return CAMPUS_EMAIL_DOMAIN;
@@ -805,6 +805,11 @@ async function hOauthAuthorizeInfo(ctx) {
 
 async function hOauthAuthorizeConfirm(ctx) {
   const { body, env, user } = ctx;
+  // 仅入学申请已通过（已录取）的用户可使用校园邮箱 OAuth 授权；
+  // 未申请入学或入学失败（status=failed）的用户不允许使用。
+  if (user.status !== 'approved') {
+    throw new ApiError(403, '仅入学申请已通过（已录取）的用户可使用校园邮箱 OAuth 授权；未申请入学或入学失败的用户不可使用');
+  }
   const client = await db.oauthClientById(env, String(body.clientId || ''));
   const redirectUri = String(body.redirectUri || '');
   const codeChallenge = String(body.codeChallenge || '').trim();
@@ -869,6 +874,10 @@ async function hOauthToken(ctx) {
     const user = await db.userByUsername(env, username);
     if (!user || !(await verifyPassword(String(body.password || ''), user.passwordHash))) {
       throw new ApiError(401, '用户名或密码错误');
+    }
+    // 仅入学申请已通过（已录取）的用户可使用校园邮箱 OAuth 授权
+    if (user.status !== 'approved') {
+      throw new ApiError(403, '仅入学申请已通过（已录取）的用户可使用校园邮箱 OAuth 授权；未申请入学或入学失败的用户不可使用');
     }
     const token = await createAccessToken(env, user.id, client.clientId);
     return ok({
@@ -978,7 +987,7 @@ async function apiDocs(ctx) {
         title: '二、“我的E校园”内部接口',
         desc: '本系统前端的注册、登录、验证码与入学申请均基于以下接口。AI 助手若需替用户完成批量或自动化操作，可直接调用；注意入学申请接口需要图形验证码。',
         items: [
-          { method: 'POST', path: '/api/auth/register', desc: '注册“我的E校园”账号。注册成功后默认状态为 registered，可继续完成个人联系邮箱验证并调用 /api/apply 提交入学申请。入学审核通过后，校园邮箱地址即为 <用户名>@stu.sibaihua.com；校园邮箱平台使用「我的E校园」OAuth 登录，无需单独开通邮箱。若管理后台开启 Turnstile 人机验证，则需附带 cfTurnstileToken。', params: [
+          { method: 'POST', path: '/api/auth/register', desc: '注册“我的E校园”账号。注册成功后默认状态为 registered，可继续完成个人联系邮箱验证并调用 /api/apply 提交入学申请。入学审核通过后，校园邮箱地址即为 <用户名>@stu.sibaihua.com，但不会立即开通；需前往校园邮箱平台（mail.sibaihua.com）使用「我的E校园」账号完成 OAuth 登录后自动开通。注意：仅入学已通过（status=approved）的用户可使用校园邮箱 OAuth 授权，未申请入学或入学失败（status=failed）的用户将被拒绝。若管理后台开启 Turnstile 人机验证，则需附带 cfTurnstileToken。', params: [
             { name: 'cfTurnstileToken', type: 'string', required: '开关开启时', desc: 'Cloudflare Turnstile 前端小部件返回的 token（管理后台「系统设置」可开关）' },
             { name: 'username', type: 'string', required: '是', desc: '至少 3 位（最长 30 位），仅限字母/数字，可含 . _ -，且以字母/数字开头结尾，不能为纯数字，建议使用英文姓名或其简拼；即校园邮箱 username@stu.sibaihua.com 的前缀' },
             { name: 'password', type: 'string', required: '是', desc: '6-64 位；用于「我的E校园」登录（校园邮箱通过 OAuth 登录，无需单独密码）' },
@@ -1000,7 +1009,7 @@ async function apiDocs(ctx) {
             { name: 'newPassword', type: 'string', required: '是', desc: '新密码 6-64 位' },
           ], response: '{ "code": 200, "message": "密码已修改（仅同步“我的E校园”登录密码，校园邮箱密码不受影响）" }' },
           { method: 'GET', path: '/api/captcha', desc: '获取图形验证码。返回 SVG 图形与 captchaId，5 分钟有效、一次性使用。调用 /api/apply 前必须先获取并让用户识别验证码。', response: '{ "code": 200, "data": { "captchaId": "uuid", "image": "<svg ...>" } }' },
-          { method: 'POST', path: '/api/apply', desc: '提交入学申请。前置条件：个人联系邮箱已通过 /api/verify-email/* 完成验证（emailVerified=true）。验证码校验通过后自动录取。校园邮箱地址即为 <用户名>@stu.sibaihua.com，校园邮箱通过「我的E校园」OAuth 登录，系统不再自动开通邮箱。', headers: 'Authorization: Bearer <会话令牌>', params: [
+          { method: 'POST', path: '/api/apply', desc: '提交入学申请。前置条件：个人联系邮箱已通过 /api/verify-email/* 完成验证（emailVerified=true）。验证码校验通过后自动录取（status=approved）。录取后校园邮箱地址即为 <用户名>@stu.sibaihua.com，但不会立即开通；需前往校园邮箱平台（mail.sibaihua.com）使用「我的E校园」账号完成 OAuth 登录后才会自动开通。', headers: 'Authorization: Bearer <会话令牌>', params: [
             { name: 'cfTurnstileToken', type: 'string', required: '开关开启时', desc: 'Cloudflare Turnstile token（管理后台「系统设置」可开关）' },
             { name: 'englishName', type: 'string', required: '是', desc: '英文姓名，2-60 位英文字母（可含空格、连字符、单引号、点）' },
             { name: 'contactEmail', type: 'string', required: '是', desc: '个人联系邮箱（任意域名均可），必须与已验证的邮箱完全一致' },
@@ -1016,14 +1025,14 @@ async function apiDocs(ctx) {
         desc: '用于管理用户（查询/创建/编辑/删除）、OAuth 客户端与系统设置。AI 助手在帮管理员操作时，应始终携带管理员会话令牌。',
         items: [
           { method: 'GET', path: '/api/admin/users', desc: '获取所有用户列表与统计信息。', headers: 'Authorization: Bearer <管理员会话令牌>', response: '{ "code": 200, "data": { "users": [...], "stats": { "total": 10, "registered": 3, "approved": 6, "failed": 1 } } }' },
-          { method: 'POST', path: '/api/admin/users', desc: '由管理员直接创建用户（不经过注册流程，也不会自动开通邮箱）。', headers: 'Authorization: Bearer <管理员会话令牌>', params: [
+          { method: 'POST', path: '/api/admin/users', desc: '由管理员直接创建用户（不经过注册流程，用户需自行通过「我的E校园」OAuth 登录后校园邮箱才会开通）。', headers: 'Authorization: Bearer <管理员会话令牌>', params: [
             { name: 'username', type: 'string', required: '是', desc: '用户名，规则同注册' },
             { name: 'password', type: 'string', required: '是', desc: '密码 6-64 位' },
             { name: 'role', type: 'string', required: '否', desc: 'user（默认）或 admin' },
             { name: 'englishName', type: 'string', required: '否', desc: '英文姓名' },
             { name: 'contactEmail', type: 'string', required: '否', desc: '联系邮箱' },
           ], response: '{ "code": 200, "message": "用户已创建", "data": { "user": { ... } } }' },
-          { method: 'PUT', path: '/api/admin/users', desc: '编辑用户。所有字段均可选，只传需要修改的。校园邮箱由用户名推导为 <用户名>@stu.sibaihua.com（校园邮箱通过「我的E校园」OAuth 登录，无需单独开通，故修改用户名会同步更新该推导值）；修改密码只更新「我的E校园」登录密码（哈希与密文），不影响校园邮箱的 OAuth 登录。', headers: 'Authorization: Bearer <管理员会话令牌>', params: [
+          { method: 'PUT', path: '/api/admin/users', desc: '编辑用户。所有字段均可选，只传需要修改的。校园邮箱由用户名推导为 <用户名>@stu.sibaihua.com（使用「我的E校园」OAuth 登录后自动开通，故修改用户名会同步更新该推导值）；修改密码只更新「我的E校园」登录密码（哈希与密文），不影响校园邮箱的 OAuth 登录。', headers: 'Authorization: Bearer <管理员会话令牌>', params: [
             { name: 'id', type: 'integer', required: '是', desc: '用户 ID' },
             { name: 'username', type: 'string', required: '否', desc: '新用户名（不能与现有用户重复）' },
             { name: 'password', type: 'string', required: '否', desc: '新密码（6-64 位，不传或空则不修改）' },
