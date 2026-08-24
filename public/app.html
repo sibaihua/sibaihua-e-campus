@@ -33,7 +33,7 @@ const state = { user: null, captchaId: null, emailSent: false, pubCfg: null };
 const main = document.getElementById('main');
 
 /* 密码体系提示（首次开通邮箱时展示） */
-const PASSWORD_NOTE = '温馨提示：校园邮箱使用「我的E校园」OAuth 登录后自动开通，无需单独设密码。';
+const PASSWORD_NOTE = '温馨提示：校园邮箱使用「我的E校园」OAuth 登录后自动开通，无需单独设密码；此处仅用于修改「我的E校园」登录密码。';
 
 const CHECK_SVG = `
 <svg class="success-icon" width="76" height="76" viewBox="0 0 76 76" aria-hidden="true">
@@ -324,7 +324,7 @@ function renderProfile() {
   return `
     <section class="card main-card">
       <div class="card-head"><h2>个人设置 · 登录密码</h2>
-        <p class="muted">校园邮箱使用「我的E校园」OAuth 登录后自动开通，无需单独设密码。</p></div>
+        <p class="muted">校园邮箱使用「我的E校园」OAuth 登录后自动开通，无需单独设密码；此处仅用于修改「我的E校园」登录密码。</p></div>
       <form id="pwForm">
         <label class="field"><span class="field-label">原密码 <em>*</em></span>
           <input name="oldPassword" type="password" required maxlength="64" autocomplete="current-password"></label>
