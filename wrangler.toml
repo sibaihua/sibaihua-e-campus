@@ -28,7 +28,7 @@ database_id = "6cdfa903-19d3-4f51-8b5a-55af7543c197"
 # 非敏感默认变量（随代码部署；⚠️ 会覆盖控制台同名普通变量）
 [vars]
 TURNSTILE_SITE_KEY = "0x4AAAAAAEWvmxLZVjDXieV9"
-MAIL_API_BASE = "https://gayg.de"
+MAIL_API_BASE = "https://mail.sibaihua.com"
 MAIL_FROM = "no-reply@sibh.cn"
 MAIL_FROM_NAME = "司白画大学清迈分校 · 我的E校园"
 # ─────────────────────────────────────────────────────────────────────

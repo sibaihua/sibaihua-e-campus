@@ -35,7 +35,7 @@ body {
   /* 全站统一校园背景（登录页/后台均可见）：深蓝罩层调淡，画面更明亮 */
   background:
     linear-gradient(180deg, rgba(20, 39, 64, 0.38) 0%, rgba(20, 39, 64, 0.2) 45%, rgba(20, 39, 64, 0.44) 100%),
-    url('https://cdn.mriders.cn/img/2026/08/6a84980625177.jpg');
+    url('https://cdn.mriders.cn/img/2026/08/6a8a93de4afec.jpg');
   background-size: cover;
   background-position: center;
   background-attachment: fixed;

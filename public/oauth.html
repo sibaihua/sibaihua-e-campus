@@ -94,7 +94,7 @@ async function confirm() {
   const logo = `<img src="${esc(app.logoUrl || LOGO_URL)}" alt="" class="app-logo" onerror="this.outerHTML='<span class=\\'app-icon\\'>${esc(initial)}</span>'">`;
   card.innerHTML = `
     <h2>确认授权</h2>
-    <p class="muted" style="margin-top:8px">你正在使用“我的E校园”账号<br><strong>${esc(me.data.user.username)}</strong>（${esc(me.data.user.username)}@gayg.de）</p>
+    <p class="muted" style="margin-top:8px">你正在使用“我的E校园”账号<br><strong>${esc(me.data.user.username)}</strong>（${esc(me.data.user.username)}@stu.sibaihua.com）</p>
     <div class="oauth-app">
       ${logo}
       <div><strong>${esc(app.name)}</strong><br><span class="muted" style="font-size:12px">${esc(app.clientId)}</span></div>

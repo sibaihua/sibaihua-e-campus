@@ -35,7 +35,7 @@
     <form id="userEditForm" class="card user-edit-panel" hidden>
       <div class="card-head">
         <h2 id="userEditTitle">编辑用户</h2>
-        <p class="muted">修改用户名会同步更新系统中记录的校园邮箱前缀（仅系统记录，gayg.de 真实邮箱地址不变）；修改密码只更新「我的E校园」登录密码，校园邮箱真实密码不受影响；密码留空表示不修改。</p>
+        <p class="muted">修改用户名会同步更新系统中记录的校园邮箱前缀（仅系统记录，stu.sibaihua.com 真实邮箱地址不变）；修改密码只更新「我的E校园」登录密码，校园邮箱真实密码不受影响；密码留空表示不修改。</p>
       </div>
       <div class="form-grid">
         <label class="field"><span class="field-label">用户名</span>
@@ -102,7 +102,7 @@
   <section class="card admin-card" id="panel-settings" hidden>
     <div class="card-head">
       <h2>系统设置</h2>
-      <p class="muted">校园邮箱无需配置：由用户名推导为 <code>username@gayg.de</code>，Cloud Mail（gayg.de）平台通过「我的E校园」OAuth 登录即可使用，无需单独开通。以下仅管理人机验证、邮箱验证模式与图书馆入口。</p>
+      <p class="muted">校园邮箱无需配置：由用户名推导为 <code>username@stu.sibaihua.com</code>，Cloud Mail（mail.sibaihua.com）平台通过「我的E校园」OAuth 登录即可使用，无需单独开通。以下仅管理人机验证、邮箱验证模式与图书馆入口。</p>
     </div>
     <form id="settingsForm">
       <div class="form-grid">
@@ -381,7 +381,7 @@ async function loadSettings() {
   form.libraryBasicUsername.value = library.basicUsername || 'sibaihua';
   form.libraryBasicPassword.value = '';
   document.getElementById('settingsInfo').innerHTML =
-    `校园邮箱域：<code>@${esc(r.data.campusEmailDomain || 'gayg.de')}</code>` +
+    `校园邮箱域：<code>@${esc(r.data.campusEmailDomain || 'stu.sibaihua.com')}</code>` +
     ` · Turnstile 人机验证：${r.data.turnstileEnabled ? '<strong style="color:var(--success)">已开启</strong>' : '<span style="color:var(--muted)">已关闭</span>'}` +
     ` · 邮箱验证：${r.data.emailVerifyEnabled ? '<strong style="color:var(--success)">启用中</strong>' : '<span style="color:var(--muted)">未启用</span>'}` +
     ` · 图书馆：<code>${esc(library.url || 'https://102007.xyz')}</code>${library.hasBasicPassword ? ' · Basic 密码已设置' : ' · <span style="color:var(--muted)">Basic 密码为空</span>'}`;
