@@ -1,7 +1,7 @@
 /**
  * 邮件发送（Cloudflare Worker 版）
- * Worker 无 net/tls，不能用 SMTP 直连；改为 MailChannels Transactional Email API
- * （Cloudflare 生态，免费，需在域名 DNS 添加 mailchannels 相关记录，见 README）。
+ * Worker 无 net/tls，不能用 SMTP 直连；改为 Resend Transactional Email API
+ * （https://api.resend.com/emails）。发件域名需在 Resend 后台完成 DNS 验证。
  * 发送失败时会抛出带中文信息的 Error。
  */
 'use strict';
@@ -59,10 +59,10 @@ export async function getMailProvider(env, db) {
   let s = {};
   if (raw) { try { s = JSON.parse(raw); } catch { s = {}; } }
   return {
-    provider: s.provider || 'mailchannels',
+    provider: s.provider || 'resend',
     from: s.from || env.MAIL_FROM || 'no-reply@sibh.cn',
     fromName: s.fromName || env.MAIL_FROM_NAME || '司白画大学清迈分校 · 我的E校园',
-    apiKey: s.apiKey || env.MAILCHANNELS_API_KEY || '',
+    apiKey: s.apiKey || env.RESEND_API_KEY || '',
     domain: s.domain || (s.from || '').split('@')[1] || '',
   };
 }
@@ -72,19 +72,20 @@ export async function saveMailProvider(env, db, cfg) {
   await db.setSetting(env, 'mail_provider_json', JSON.stringify(cfg));
 }
 
-/** 通过 MailChannels API 发送 HTML 邮件 */
-async function sendViaMailChannels(cfg, { to, subject, html }) {
+/** 通过 Resend API 发送 HTML 邮件 */
+async function sendViaResend(cfg, { to,  subject, html }) {
+  const from = cfg.fromName ? `${cfg.fromName} <${cfg.from}>` : cfg.from;
   const payload = {
-    personalizations: [{ to: [{ email: to }] }],
-    from: cfg.fromName ? { email: cfg.from, name: cfg.fromName } : { email: cfg.from },
+    from,
+    to: [to],
     subject,
-    content: [{ type: 'text/html', value: html }],
-    // 便于收件人退信回执（可选）
-    headers: { 'X-MC-User-Agent': 'sibaihua-e-campus' },
+    html,
   };
-  const headers = { 'Content-Type': 'application/json' };
-  if (cfg.apiKey) headers['X-API-KEY'] = cfg.apiKey;
-  const res = await fetch('https://api.mailchannels.net/tx/v1/send', {
+  const headers = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${cfg.apiKey}`,
+  };
+  const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers,
     body: JSON.stringify(payload),
@@ -98,13 +99,13 @@ async function sendViaMailChannels(cfg, { to, subject, html }) {
 
 /**
  * 发送一封 HTML 邮件。入口：sendMail(env, db, { to, subject, html })
- * 支持 provider：mailchannels（默认）
+ * 支持 provider：resend（默认）
  */
 export async function sendMail(env, db, { to, subject, html, cfgOverride }) {
   const cfg = cfgOverride || (await getMailProvider(env, db));
   if (!cfg.from) throw new Error('邮件服务未配置，请在管理后台「系统设置 · 邮件服务」中填写发件邮箱');
-  if (cfg.provider === 'mailchannels') {
-    return sendViaMailChannels(cfg, { to, subject, html });
+  if (cfg.provider === 'resend') {
+    return sendViaResend(cfg, { to, subject, html });
   }
   throw new Error(`不支持的邮件服务类型: ${cfg.provider}`);
 }

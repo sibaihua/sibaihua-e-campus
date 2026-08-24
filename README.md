@@ -8,7 +8,7 @@
 | 数据存储 | **Cloudflare D1**（SQLite） | 控制台 Settings → Bindings 手动绑定 |
 | 表结构 | 首次请求 API 时**自动创建**（幂等） | 无需任何命令 |
 | 密码 | PBKDF2-SHA256 + AES-256-GCM（Web Crypto） | 内置 |
-| 发信 + 邮箱验证 | **可选功能**（MailChannels API） | 管理后台开关 + 发件配置 |
+| 发信 + 邮箱验证 | **可选功能**（Resend API） | 管理后台开关 + 发件配置 |
 | 人机验证 | Cloudflare Turnstile | 管理后台开关 + 环境变量密钥 |
 | 静态前端 | Worker 内置静态资源（`public/`） | 随代码自动托管 |
 | 校园邮箱 | 由用户名推导为 `username@stu.sibaihua.com`，使用「我的E校园」OAuth 登录后自动开通 | 仅入学已通过的用户可用；无需管理员账号 |
@@ -30,7 +30,7 @@ API 路径与响应结构与原 Node 版完全一致，前端无需改动。
 │   ├── schema.js        # D1 建表 SQL（首次请求自动执行）
 │   ├── db.js            # D1 数据访问层
 │   ├── auth.js          # PBKDF2 哈希 + AES-256-GCM
-│   ├── mail.js          # MailChannels 邮件发送 + 模板
+│   ├── mail.js          # Resend 邮件发送 + 模板
 │   └── captcha.js       # SVG 图形验证码
 ├── public/              # 静态前端（自动托管）
 ├── schema.sql           # 建表 SQL（备用，也可在 D1 Console 手动执行）
@@ -78,7 +78,7 @@ Worker 详情页 → **Settings → Variables** → **Add**。**关键：敏感�
 |---|---|---|---|
 | `SECRET` | **Secret** | **强烈建议** | 密码加密密钥，生产环境务必改为 ≥32 位随机串 |
 | `TURNSTILE_SECRET` | **Secret** | 建议 | Turnstile 服务端密钥（若用官方面板默认密钥可留空） |
-| `MAILCHANNELS_API_KEY` | **Secret** | 否 | MailChannels 密钥（也可在管理后台填写） |
+| `RESEND_API_KEY` | **Secret** | 否 | Resend API Key（也可在管理后台填写） |
 | `SEED_ADMIN_PASSWORD` | **Secret** | 否 | 首次部署自动创建的管理员 `iam` 的密码（默认 `858308533`） |
 
 > 其余默认变量（`TURNSTILE_SITE_KEY`、`MAIL_API_BASE`、`MAIL_FROM`、`MAIL_FROM_NAME`）已内置在 `wrangler.toml`，**无需在控制台添加**；如确实要覆盖，改仓库里的 `wrangler.toml` 再 push 即可（控制台改会被构建覆盖）。
@@ -86,7 +86,7 @@ Worker 详情页 → **Settings → Variables** → **Add**。**关键：敏感�
 ## 五、发信与邮箱验证（可选功能）
 
 > **说明**：Cloudflare 的 Email 相关绑定（Email Workers / Email Routing）只负责**接收**邮件；
-> 本项目发送验证码邮件使用 **MailChannels Transactional Email API**（Cloudflare 生态，免费），
+> 本项目发送验证码邮件使用 **Resend Transactional Email API**（https://api.resend.com/emails），
 > 无需也无法作为绑定添加。
 
 **邮箱验证是可选的**：部署后不配置任何邮件服务也能正常招生——学生申请时直接填写个人联系邮箱即可提交，不需要验证码。三种模式在管理后台「系统设置」切换：
@@ -99,12 +99,9 @@ Worker 详情页 → **Settings → Variables** → **Add**。**关键：敏感�
 
 如需开启邮件验证码，按以下两步配置：
 
-1. **域名验证**（一次性）：在发件域名 DNS 添加 TXT 记录
-   | 类型 | 名称 | 值 |
-   |---|---|---|
-   | TXT | `_mailchannels` | `v=mc1 cfid=<你的域名>` |
-2. 打开管理后台（登录 `iam` 管理员）→ **系统设置 → 邮件服务**：
-   - 填发件邮箱（如 `no-reply@sibh.cn`）、发件人名称、MailChannels API Key（可选）
+1. **域名验证**（一次性）：在 Resend 后台完成发件域名的 DNS 验证（添加 Resend 要求的 SPF/DKIM 记录）。
+2. 打开管理后台 → **系统设置 → 邮件服务**：
+   - 填发件邮箱（如 `no-reply@sibh.cn`，需已在 Resend 验证）、发件人名称、Resend API Key（可选）
    - 点「发送测试邮件」验证连通性
 
 ## 六、导入旧系统数据（可选，全新部署可跳过）
@@ -133,6 +130,6 @@ npm run dev                        # http://localhost:8787/
 - **注册提示「数据库未就绪」**：确认控制台 D1 里数据库名是否为 `sibaihua-e-campus`（与 wrangler.toml 的 `database_name` 一致），不一致会绑定失败。
 - **注册提示「人机验证未通过」**：`TURNSTILE_SECRET` 未配置或与站点密钥不配套；管理后台可临时关闭 Turnstile 排查。
 - **学生申请被要求验证邮箱但发不出验证码**：管理后台「系统设置 · 邮箱验证功能」切到「自动/关闭」，或先配置邮件服务。
-- **验证码邮件收不到**：先到管理后台「系统设置 · 邮件服务」发测试邮件；确认 MailChannels 域名 TXT 验证已生效。
+- **验证码邮件收不到**：先到管理后台「系统设置 · 邮件服务」发测试邮件；确认 Resend 域名 DNS 验证已生效。
 - **旧用户登录不了**：迁移时 `SECRET` 必须与线上 `SECRET` 一致；如不一致，用管理后台重置该用户密码。
 - **免费额度**：Workers 免费套餐每天 10 万请求；D1 免费 5GB 存储，对本场景绰绰有余。

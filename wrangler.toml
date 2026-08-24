@@ -3,7 +3,7 @@
 # 重要（Workers Builds / Git 集成机制）：
 #   - 每次 Git push 触发构建部署时，Worker 的 绑定(Bindings) 和 普通变量(Variables)
 #     都会重置为 wrangler.toml 里声明的内容 → 所以 D1 绑定与默认变量写在这里
-#   - 敏感值（SECRET / TURNSTILE_SECRET / MAILCHANNELS_API_KEY）不能进仓库，
+#   - 敏感值（SECRET / TURNSTILE_SECRET / RESEND_API_KEY）不能进仓库，
 #     必须在控制台以 Secret 类型添加 —— Secret 不会被构建覆盖
 
 name = "sibaihua-e-campus"
@@ -38,6 +38,6 @@ MAIL_FROM_NAME = "司白画大学清迈分校 · 我的E校园"
 # （Secret 不会被构建覆盖；普通 Variable 会被清空，切勿用普通变量存密钥）：
 #   SECRET                密码加密密钥（生产必改，≥32 位随机串）
 #   TURNSTILE_SECRET      Cloudflare Turnstile 服务端密钥
-#   MAILCHANNELS_API_KEY  MailChannels API Key（可选）
+#   RESEND_API_KEY       Resend API Key（可选）
 #   SEED_ADMIN_PASSWORD   首次部署自动创建的管理员 iam 的密码（可选）
 # ─────────────────────────────────────────────────────────────────────
