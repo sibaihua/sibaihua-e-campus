@@ -165,19 +165,6 @@ const db = {
     await env.DB.prepare('DELETE FROM oauth_clients WHERE client_id = ?').bind(clientId).run();
   },
 
-  /* ---------- 验证码 ---------- */
-  async createCaptcha(env, id, code, expiresAt) {
-    await env.DB.prepare('INSERT INTO captchas (id, code, expires_at) VALUES (?, ?, ?)').bind(id, code, expiresAt).run();
-  },
-  async getCaptcha(env, id) {
-    const r = await env.DB.prepare('SELECT * FROM captchas WHERE id = ?').bind(id).first();
-    if (!r) return null;
-    return { code: r.code, expiresAt: r.expires_at };
-  },
-  async deleteCaptcha(env, id) {
-    await env.DB.prepare('DELETE FROM captchas WHERE id = ?').bind(id).run();
-  },
-
   /* ---------- 邮箱验证 ---------- */
   async getEmailVerification(env, userId) {
     const r = await env.DB.prepare('SELECT * FROM email_verifications WHERE user_id = ?').bind(userId).first();
