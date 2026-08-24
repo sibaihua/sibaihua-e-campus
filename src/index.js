@@ -980,7 +980,7 @@ async function apiDocs(ctx) {
         items: [
           { method: 'POST', path: '/api/auth/register', desc: '注册“我的E校园”账号。注册成功后默认状态为 registered，可继续完成个人联系邮箱验证并调用 /api/apply 提交入学申请。入学审核通过后，校园邮箱地址即为 <用户名>@stu.sibaihua.com；校园邮箱平台使用「我的E校园」OAuth 登录，无需单独开通邮箱。若管理后台开启 Turnstile 人机验证，则需附带 cfTurnstileToken。', params: [
             { name: 'cfTurnstileToken', type: 'string', required: '开关开启时', desc: 'Cloudflare Turnstile 前端小部件返回的 token（管理后台「系统设置」可开关）' },
-            { name: 'username', type: 'string', required: '是', desc: '至少 3 位（最长 30 位），仅限字母/数字，可含 . _ -，不能为纯数字，建议使用英文姓名或其简拼；即校园邮箱 username@stu.sibaihua.com 的前缀' },
+            { name: 'username', type: 'string', required: '是', desc: '至少 3 位（最长 30 位），仅限字母/数字，可含 . _ -，且以字母/数字开头结尾，不能为纯数字，建议使用英文姓名或其简拼；即校园邮箱 username@stu.sibaihua.com 的前缀' },
             { name: 'password', type: 'string', required: '是', desc: '6-64 位；用于「我的E校园」登录（校园邮箱通过 OAuth 登录，无需单独密码）' },
           ], response: '{ "code": 200, "data": { "token": "会话令牌", "user": { "id": 3, "username": "zhangsan", "status": "registered", ... } } }' },
           { method: 'POST', path: '/api/auth/login', desc: '登录并获取会话令牌。用户名可输入 "zhangsan" 或 "zhangsan@stu.sibaihua.com"，效果相同。登录不需要人机验证。', params: [
