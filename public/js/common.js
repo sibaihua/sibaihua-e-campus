@@ -38,7 +38,7 @@ const API = {
   put(url, body) { return this.request('PUT', url, body); },
 };
 
-const LOGO_URL = 'https://cdn.mriders.cn/img/2026/08/6a82000f8ce84.png';
+const LOGO_URL = 'https://cdn.sibh.cn/img/2026/08/6a82000f8ce84.png';
 
 /* ---------- Cloudflare Turnstile 人机验证（显式渲染模式） ---------- */
 const TURNSTILE_SITE_KEY = '0x4AAAAAAEWvmxLZVjDXieV9';
